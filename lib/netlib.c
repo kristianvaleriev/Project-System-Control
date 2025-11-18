@@ -60,6 +60,14 @@ char* get_host(int socktype, int addr_family, char* buf, size_t buf_len)
 }
 
 // MULTICAST FUNCTIONS AND MACROS
+/*
+* Here the client and the server change places. Firstly the server sends a msg to all listing 
+* clients in a particular group of the local network which contains it's IP address and AF.
+* The clients recvs it, search for that IP by DNS (getaddrinfo), and connects it.
+*
+* Server - send();
+* Client - recv();
+*/
 #define MULTICAST_ADDR "239.255.255.250"
 #define MULTICAST_PORT 16131
 
