@@ -1,4 +1,5 @@
 #include "../include/network.h"
+#include <stdio.h>
 
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 256
@@ -238,4 +239,24 @@ void* convert_addr(struct sockaddr* addr)
     if (addr->sa_family == AF_INET)
         return &(((struct sockaddr_in*) addr)->sin_addr);
     return &(((struct sockaddr_in6*) addr)->sin6_addr);
+}
+
+/*
+ * The standard send() function can return even if only a part of the data 
+ * was sent. In that case it's our responsibility to send the rest 
+ * (because ofc it's ours, that is the Unix way ("This is the way.")).
+*/
+ssize_t sendall(int socket, void* buf, size_t bytes, int flags)
+{
+    ssize_t sent  = 0;
+    size_t offset = 0;
+    while ((sent = send(socket, buf + offset, bytes, flags) != bytes))
+    {
+        if (sent < 0)
+            break;
+        offset += sent;
+        bytes  -= offset;
+    }
+
+    return (offset) ? sent : -1;
 }

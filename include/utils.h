@@ -18,6 +18,6 @@ void err_info(const char *fmt, ...);
 * Utils
 */ 
 
-void get_program_name(char const* argv);
+char* get_program_name(char const* argv);
 
 #endif

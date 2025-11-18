@@ -1,7 +1,7 @@
 #include <string.h>
 
 
-void get_program_name(char const* argv)
+char* get_program_name(char const* argv)
 {
     // Extract program's name from argv[0] 
     char* ptr = strrchr(argv, '/');
@@ -9,7 +9,10 @@ void get_program_name(char const* argv)
     if (ptr) {
         offset = ptr - argv;
     } 
-    extern char* program_name;
+
+  extern char* program_name;
     program_name = strdup(argv + offset);
+
+    return program_name;
 }
 
