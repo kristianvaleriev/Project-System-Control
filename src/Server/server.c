@@ -16,7 +16,7 @@ int main(int argc, char** argv)
     struct addrinfo server_ip;
 
     get_program_name(argv[0]);
-
+        
     int listening_socket = get_listening_socket(&server_ip);
     if (listening_socket < 0) {
         if (listening_socket == -1) 
@@ -24,10 +24,10 @@ int main(int argc, char** argv)
         else 
             err_sys("Could not get a listening socket (err_n=%d)", listening_socket);
     }
-
+            
     char buf[128] = {0};
     inet_ntop(server_ip.ai_family,
               convert_addr(server_ip.ai_addr),
               buf, sizeof buf);
-
+        
 }
