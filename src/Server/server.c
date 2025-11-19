@@ -29,5 +29,10 @@ int main(int argc, char** argv)
     inet_ntop(server_ip.ai_family,
               convert_addr(server_ip.ai_addr),
               buf, sizeof buf);
+<<<<<<< HEAD
         
+=======
+
+    info_msg("Server's ip is: %s", buf);
+>>>>>>> 0cd131b46e505dee919cc02374a35b20febcc209
 }
