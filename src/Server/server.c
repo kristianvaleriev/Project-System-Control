@@ -30,4 +30,5 @@ int main(int argc, char** argv)
               convert_addr(server_ip.ai_addr),
               buf, sizeof buf);
 
+    info_msg("Server's ip is: %s", buf);
 }

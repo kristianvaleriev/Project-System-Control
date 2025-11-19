@@ -30,8 +30,12 @@ int get_listening_socket(struct addrinfo* binded_ai)
             if ( ! setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, 
                    /*funny-*/ &(int){1}, temp_ai->ai_protocol)) 
             {
-                if ( ! bind(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen))
+                if ( ! bind(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen)) {
+                    if (binded_ai) {
+                        memcpy(binded_ai, temp_ai, sizeof *temp_ai);
+                    }
                     break;
+                }
             } 
             else socket_fd = -2;
         }
@@ -42,9 +46,6 @@ int get_listening_socket(struct addrinfo* binded_ai)
         return socket_fd;
     if (!temp_ai) 
         return -3;
-
-    if (binded_ai)
-        memcpy(binded_ai, temp_ai, sizeof *temp_ai);
 
     if (listen(socket_fd, 10) < 0)
         return -4;

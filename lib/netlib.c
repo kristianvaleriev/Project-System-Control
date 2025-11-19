@@ -1,5 +1,18 @@
 #include "../include/network.h"
+
 #include <stdio.h>
+#include <netdb.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/uio.h>
+#include <syslog.h>
+#include <ctype.h>
 
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 256
@@ -16,7 +29,7 @@ char* get_host(int socktype, int addr_family, char* buf, size_t buf_len)
     char* str = malloc(n);
     if (!str) 
         return 0;
-    if (gethostname(str, n) < 0) {
+    if (gethostname(str, n) < 2) {
         goto RETURN;
     }
 
