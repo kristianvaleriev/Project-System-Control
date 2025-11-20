@@ -3,11 +3,13 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <sys/syslog.h>
+#include <syslog.h>
 
 /*
-* Stolen implemation from the perfect book "Advanced Programming in the UNIX Envi"
+* Stolen implemation from the excellent book "Advanced Programming in the UNIX Envi"
 * altho it is prety standard anyway (just lazy to make my own ig). 
-* Atleast I made them prettier!
+* Atleast I made them prettier! (Heavaly modified)
 */
 
 #define MAXLINE 4096
@@ -15,11 +17,24 @@
 
 extern char* program_name;
 
+// Variables defined and used by the server running as deamon.
+static int is_daemon;
+int priority = LOG_NOTICE;
+
+void init_syslog(char* name, int option, int facility)
+{
+    open(name, option, facility);
+    is_daemon = 1;
+}
+
 // Some modifications so that messages display our program's given name
 static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
 {
     char buf[MAXLINE];
-    size_t len = snprintf(buf, MAXLINE-1, NAME_DISPLAY, program_name);
+    size_t len = 0;
+
+    if (program_name)
+        len = snprintf(buf, MAXLINE-1, NAME_DISPLAY, program_name);
     len += vsnprintf(buf + len, MAXLINE-len-1, fmt, ap);
 
     if (errnoflag)
@@ -27,9 +42,14 @@ static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
                  strerror(error));
 
     strcat(buf, "\n");
-    fflush(stdout); /* in case stdout and stderr are the same */
-    fputs(buf, stderr);
-    fflush(NULL); /* flushes all stdio output streams */
+
+    if (!is_daemon) {
+        fflush(stdout); /* in case stdout and stderr are the same */
+        fputs(buf, stderr);
+        fflush(NULL); /* flushes all stdio output streams */
+    }
+    else 
+        syslog(priority, "%s", buf);
 }
 
 /*

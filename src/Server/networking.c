@@ -1,5 +1,6 @@
 #include "../../include/includes.h"
 #include "../../include/network.h"
+#include "../../include/utils.h"
 
 #include <asm-generic/socket.h>
 #include <string.h>
@@ -33,6 +34,13 @@ int get_listening_socket(struct addrinfo* binded_ai)
                 if ( ! bind(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen)) {
                     if (binded_ai) {
                         memcpy(binded_ai, temp_ai, sizeof *temp_ai);
+
+                        if (temp_ai->ai_canonname) // stupid strdup doesnt check for NULL ptrs...
+                            binded_ai->ai_canonname = strdup(temp_ai->ai_canonname);
+
+                        struct sockaddr* var = malloc(sizeof *var);
+                        *var = *temp_ai->ai_addr; // same as memcpy()
+                        binded_ai->ai_addr = var;
                     }
                     break;
                 }
@@ -51,4 +59,17 @@ int get_listening_socket(struct addrinfo* binded_ai)
         return -4;
     
     return socket_fd;
+}
+
+void print_ip_addr(void* sock_addr, char* msg, void (*print_fn)(char* fmt, ...))
+{
+    struct sockaddr* addr = (struct sockaddr*) sock_addr;
+
+    char buf[128] = {0};
+    if (inet_ntop(addr->sa_family,
+              convert_addr(addr),
+              buf, sizeof buf))
+        print_fn(msg, buf);
+    else 
+        err_info("inet_ntop error");
 }

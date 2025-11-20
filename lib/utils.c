@@ -1,7 +1,7 @@
 #include <string.h>
 
 
-char* get_program_name(char const* argv)
+char* set_program_name(char const* argv)
 {
     // Extract program's name from argv[0] 
     char* ptr = strrchr(argv, '/');

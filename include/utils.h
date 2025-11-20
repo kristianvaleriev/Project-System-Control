@@ -18,6 +18,7 @@ void err_info(const char *fmt, ...);
 * Utils
 */ 
 
-char* get_program_name(char const* argv);
+void  init_syslog(char*, int, int);
+char* set_program_name(char const* argv);
 
 #endif
