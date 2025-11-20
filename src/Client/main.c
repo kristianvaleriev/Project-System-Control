@@ -13,6 +13,11 @@ int main(int argc, char** argv)
 {
     set_program_name(argv[0]);
 
+    struct sockaddr server_addr;
+    multicast_recv_def(&server_addr, sizeof server_addr);
+
+    print_ip_addr(&server_addr, "ip: %s", info_msg);
+
     if (set_tty_raw(STDIN_FILENO) < 0) 
         err_sys("could not set raw tty mode");
 
@@ -39,6 +44,8 @@ int main(int argc, char** argv)
             if (connect(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen))
                 break;
         }
+
+
     }
     if (!temp_ai)
         err_sys("failed to connect");

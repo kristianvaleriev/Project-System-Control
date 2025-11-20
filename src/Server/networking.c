@@ -11,6 +11,9 @@
 #include <signal.h>
 #include <netdb.h>
 #include <errno.h>
+#include <ifaddrs.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 
 int get_listening_socket(struct addrinfo* binded_ai)
 {
@@ -33,7 +36,8 @@ int get_listening_socket(struct addrinfo* binded_ai)
             if ( ! setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, 
                    /*funny-*/ &(int){1}, temp_ai->ai_protocol)) 
             {
-                if ( ! bind(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen)) {
+                if ( ! bind(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen)) 
+                {
                     if (binded_ai) {
                         memcpy(binded_ai, temp_ai, sizeof *temp_ai);
 
@@ -56,20 +60,73 @@ int get_listening_socket(struct addrinfo* binded_ai)
         return socket_fd;
     if (!temp_ai) 
         return -3;
-
     if (listen(socket_fd, 10) < 0)
         return -4;
     
     return socket_fd;
 }
 
-void print_ip_addr(void* sock_addr, char* msg, void (*print_fn)(char* fmt, ...))
+/*
+* Return the IP address of one working, not loopback
+* network interface. The server listens on all net 
+* interfaces so it doesnt matter which one (I guess
+* ofc, I am not an expert).
+*/
+char* get_host_addr(struct sockaddr* addr)
 {
-    struct sockaddr* addr = (struct sockaddr*) sock_addr;
+    char* ret_addr = 0;
+    struct ifaddrs* result, *ptr;
+    getifaddrs(&result);
 
-    char buf[128] = {0};
-    if (inet_ntop(addr->sa_family,
-              convert_addr(addr),
-              buf, sizeof buf))
-        print_fn(msg, buf);
+    for (ptr = result; ptr; ptr=ptr->ifa_next)
+    {
+        if (!(ptr->ifa_flags & IFF_UP) ||
+              ptr->ifa_flags & IFF_LOOPBACK ||
+            !(strcmp(ptr->ifa_name, "lo")))
+            continue;
+
+        struct sockaddr* saddr = ptr->ifa_addr;
+
+        if (saddr->sa_family == AF_INET)
+            ret_addr = malloc(INET_ADDRSTRLEN);
+        else if (saddr->sa_family == AF_INET6)
+            ret_addr = malloc(INET6_ADDRSTRLEN);
+        else 
+            continue;
+
+        if (inet_ntop(saddr->sa_family, 
+                      convert_addr(saddr),
+                      ret_addr, INET6_ADDRSTRLEN))
+            break;
+        
+        free(ret_addr);
+        ret_addr = 0;
+    }
+
+    if (ret_addr && addr) 
+        *addr = *ptr->ifa_addr;
+
+    freeifaddrs(result);
+    return ret_addr;
+}
+
+void* multicast_beacon(void* _)
+{
+    struct sockaddr server_addr;
+    char* p_addr = get_host_addr(&server_addr);
+
+    // Here is hoping nobody notices this race cond.
+    // (probably fine if using syslog)
+    info_msg("server's ip address: %s\n", p_addr);
+    free(p_addr);
+
+    multicast_init_def();
+    while (1) {
+        multicast_send(&server_addr, sizeof server_addr);
+        sleep(5);
+    }
+
+    // Probably wont happened but still...
+    multicast_dealloc(); 
+    return 0;
 }

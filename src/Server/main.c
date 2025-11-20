@@ -20,7 +20,6 @@
 void    fork_for_client(int,int);
 void    sigchld_handler(int);
 void    set_signals(void);
-void*   multicast_beacon(void*);
 
 char* program_name = 0;
 
@@ -29,8 +28,6 @@ int main(int argc, char** argv)
     struct addrinfo server_ip;
 
     set_program_name(argv[0]);
-    char* host = get_host(SOCK_STREAM, 0,0,0);
-    printf("host: %s\n", host);
 
     // strcmp ALSO DOESN'T check for NULL......
     if (argv[1] && !strcmp(argv[1], "--daemoned"))
@@ -44,7 +41,6 @@ int main(int argc, char** argv)
             err_sys("could not get a listening socket (err num=%d)", listening_socket);
     }
             
-    print_ip_addr(server_ip.ai_addr, "server's ip address: %s", info_msg);
     set_signals();
 
     /*
@@ -101,13 +97,6 @@ void fork_for_client(int listening_socket, int client_socket)
 
     // Standard exit of child.
     exit(0);
-}
-
-void* multicast_beacon(void* _)
-{
-    
-
-    return 0;
 }
 
 /*
