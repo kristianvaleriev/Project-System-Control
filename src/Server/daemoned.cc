@@ -1,69 +1,7 @@
-#include "../../include/system.h"
-#include "../../include/conf_files.h"
+#include "../../include/includes.h"
+#include "../../include/utils.h"
+
 #include "daemon.h"
-
-void log_print(int errno_flag, int priority, char* msg, va_list args)
-{
-    char err[256] = {0};
-    if (errno_flag) 
-        snprintf(err, sizeof err, "(%s)", strerror(errno));
-
-    char fmt[1024];
-    vsprintf(fmt, msg, args);
-
-    syslog(priority, "%s:: %s %s", prog_name,  fmt, err);
-}
-
-void LOG_SYSCALL(int rc, char* fmt, ...)
-{
-    if (rc >= 0)
-        return;
-
-    va_list args;
-    va_start(args, fmt);
-    log_print(1, LOG_ERR, fmt, args);
-    va_end(args);
-
-    exit(1);
-}
-
-void LOG_NTC0(char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    log_print(0, LOG_NOTICE, fmt, args);
-    va_end(args);
-}
-
-void LOG_NTC1(char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    log_print(1, LOG_NOTICE, fmt, args);
-    va_end(args);
-}
-
-char* err_malloc(size_t size) 
-{
-    char* ptr = malloc(size);
-    if (!ptr) {
-        LOG_NTC0("malloc error");
-        exit(1);
-    }
-
-    return ptr;
-}
-
-char* err_realloc(char* ptr, size_t size) 
-{
-    ptr = realloc(ptr, size);
-    if (!ptr) {
-        LOG_NTC0("realloc error");
-        exit(1);
-    }
-
-    return ptr;
-}
 
 void daemonize()
 {

@@ -17,7 +17,7 @@
 
 extern char* program_name;
 
-// Variables defined and used by the server running as deamon.
+// Server specific logic
 static int is_daemon;
 int priority = LOG_NOTICE;
 
@@ -27,7 +27,6 @@ void init_syslog(char* name, int option, int facility)
     is_daemon = 1;
 }
 
-// Some modifications so that messages display our program's given name
 static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
 {
     char buf[MAXLINE];
@@ -61,6 +60,9 @@ void err_quit_msg(const char *fmt, ...)
     va_list ap;
     va_start(ap, fmt);
 
+    if (is_daemon)
+        priority = LOG_CRIT;
+
     err_doit(0, 0, fmt, ap);
 
     va_end(ap);
@@ -71,6 +73,9 @@ void info_msg(const char* fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+
+    if (is_daemon)
+        priority = LOG_INFO;
 
     err_doit(0,0, fmt, ap);
     va_end(ap);
@@ -84,6 +89,9 @@ void err_dump_abort(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+    if (is_daemon)
+        priority = LOG_ERR;
+
     err_doit(1, errno, fmt, ap);
 
     va_end(ap);
@@ -100,6 +108,10 @@ void err_cont(int error, const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+
+    if (is_daemon)
+        priority = LOG_WARNING;
+
     err_doit(1, error, fmt, ap);
     va_end(ap);
 }
@@ -112,6 +124,9 @@ void err_exit(int error, const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+    if (is_daemon)
+        priority = LOG_CRIT;
+
     err_doit(1, error, fmt, ap);
     va_end(ap);
     exit(1);
@@ -126,6 +141,9 @@ void err_sys(const char* fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+    if (is_daemon)
+        priority = LOG_ERR;
+
     err_doit(1, errno, fmt, ap);
 
     va_end(ap);
@@ -140,6 +158,9 @@ void err_info(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
+    if (is_daemon)
+        priority = LOG_WARNING;
+
     err_doit(1, errno, fmt, ap);
     va_end(ap);
 }

@@ -33,7 +33,8 @@ int main(int argc, char** argv)
     int socket_fd;
     for (temp_ai = result; temp_ai; temp_ai = temp_ai->ai_next)
     {
-        if ((socket_fd = socket(temp_ai->ai_family, temp_ai->ai_socktype, temp_ai->ai_protocol)) > -1) 
+        if ((socket_fd = socket(temp_ai->ai_family, temp_ai->ai_socktype, 
+                                temp_ai->ai_protocol)) > -1) 
         {
             if (connect(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen))
                 break;

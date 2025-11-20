@@ -26,6 +26,8 @@ int get_listening_socket(struct addrinfo* binded_ai)
     int socket_fd;
     for (temp_ai = result; temp_ai; temp_ai = temp_ai->ai_next)
     {
+        // Maybe it would look better if I had used continue statements
+        // but that's like 2-3 more lines of code so nah.
         if ((socket_fd = socket(temp_ai->ai_family, temp_ai->ai_socktype, temp_ai->ai_protocol)) > -1) 
         {
             if ( ! setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, 
@@ -70,6 +72,4 @@ void print_ip_addr(void* sock_addr, char* msg, void (*print_fn)(char* fmt, ...))
               convert_addr(addr),
               buf, sizeof buf))
         print_fn(msg, buf);
-    else 
-        err_info("inet_ntop error");
 }
