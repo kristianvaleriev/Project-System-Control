@@ -14,9 +14,11 @@ int main(int argc, char** argv)
     set_program_name(argv[0]);
 
     struct sockaddr server_addr;
-    multicast_recv_def(&server_addr, sizeof server_addr);
+    int multicast_status=  multicast_recv_def(&server_addr, sizeof server_addr);
+    if (multicast_status)
+        err_sys("multicast recv failed (err num: %d)", multicast_status);
 
-    print_ip_addr(&server_addr, "ip: %s", info_msg);
+    print_ip_addr(&server_addr, "got server ip: %s", info_msg);
 
     if (set_tty_raw(STDIN_FILENO) < 0) 
         err_sys("could not set raw tty mode");
@@ -25,32 +27,7 @@ int main(int argc, char** argv)
     // *resets terminal to original state*
     if (atexit(set_tty_atexit)) 
         err_sys("atexit failed");
-    
-    struct addrinfo hint, *result, *temp_ai;
-    memset(&hint, 0, sizeof hint);
-    hint.ai_family   = AF_UNSPEC;  // Either IPv4 or v6, doesn't mather.
-    hint.ai_socktype = SOCK_STREAM;// TCP please.
-    hint.ai_flags    = AI_PASSIVE; // Give me an IP.
-
-    if ((errno = getaddrinfo(NULL, KNOWN_PORT, &hint, &result))) 
-        return -1;
-
-    int socket_fd;
-    for (temp_ai = result; temp_ai; temp_ai = temp_ai->ai_next)
-    {
-        if ((socket_fd = socket(temp_ai->ai_family, temp_ai->ai_socktype, 
-                                temp_ai->ai_protocol)) > -1) 
-        {
-            if (connect(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen))
-                break;
-        }
 
 
-    }
-    if (!temp_ai)
-        err_sys("failed to connect");
-
-    puts("connected!");
-    sleep(5);
 }
 

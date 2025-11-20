@@ -40,9 +40,8 @@ int main(int argc, char** argv)
         else 
             err_sys("could not get a listening socket (err num=%d)", listening_socket);
     }
-            
-    set_signals();
 
+    set_signals();
     /*
      * Here I use a thread because:
      *  - The job is very simple and lightweitgh
