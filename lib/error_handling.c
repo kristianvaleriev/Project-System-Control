@@ -36,7 +36,7 @@ static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
         len = snprintf(buf, MAXLINE-1, NAME_DISPLAY, program_name);
     len += vsnprintf(buf + len, MAXLINE-len-1, fmt, ap);
 
-    if (errnoflag)
+    if (errnoflag && error)
         snprintf(buf+len, MAXLINE-len-1, ": %s",
                  strerror(error));
 

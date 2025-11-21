@@ -15,6 +15,8 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 
+#include "client_networking.h"
+
 int get_connected_socket(void* addr, size_t size)
 {
     struct addrinfo *result, *temp_ai;
@@ -27,18 +29,19 @@ int get_connected_socket(void* addr, size_t size)
     int status = getaddrinfo((char*) addr, KNOWN_PORT, &hints, &result);
     if (status) {
         errno = status;
-        return -1;
+        return ERR_GETADDRINFO;
     }
 
     int socket_ret;
     for (temp_ai = result; temp_ai; temp_ai = temp_ai->ai_next) 
     {
-        socket_ret = socket(temp_ai->ai_family, SOCK_STREAM, 0);
+        socket_ret = socket(temp_ai->ai_family, SOCK_STREAM, temp_ai->ai_protocol);
         if (socket_ret >= 0) {
-            if ((socket_ret = connect(socket_ret, addr, INET_ADDRSTRLEN)))
+            if (!(socket_ret = connect(socket_ret, temp_ai->ai_addr, temp_ai->ai_addrlen)))
                 break;
+            else socket_ret = ERR_CONNECT;
         }
-        else socket_ret = -2;
+        else socket_ret = ERR_SOCKET;
     }
 
     return socket_ret;

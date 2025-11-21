@@ -17,6 +17,7 @@
 #include "networking.h"
 #include "client_handling.h"
 
+
 void    fork_for_client(int,int);
 void    sigchld_handler(int);
 void    set_signals(void);
@@ -101,12 +102,12 @@ void fork_for_client(int listening_socket, int client_socket)
 /*
 * In Unix like OSes if child processes terminate before the parent does,
 * they become (literaly that's how they are called) *Zombies*, which like
-* the real ones, occupy resources that can be better spend by the system.
+* the real ones, occupy resources that can be better spend by the system elsewhere.
 * 
 * That is because the parent would maybe want to know what happened to its
 * children, so the kernel keeps that data until retrived. As any good parent
 * this server doesnt care what happened to them, but it's responsible enough 
-* to free the resources so the admin doesnt literaly kill it.
+* to free the resources so the admin doesnt literaly *kill* it.
 */ 
 void sigchld_handler(int _)
 {
