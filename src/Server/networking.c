@@ -118,11 +118,14 @@ void* multicast_beacon(void* _)
     // Here is hoping nobody notices this race cond.
     // (probably fine if using syslog)
     info_msg("server's ip address: %s\n", p_addr);
-    free(p_addr);
 
     multicast_init_def();
     while (1) {
+      #ifdef SEND_VIA_SOCKADDR // experiments
         multicast_send(&server_addr, sizeof server_addr);
+      #else
+        multicast_send(p_addr, strlen(p_addr));
+      #endif
         sleep(5);
     }
 
