@@ -20,5 +20,10 @@ void err_info(const char *fmt, ...);
 
 void  init_syslog(char*, int, int);
 char* set_program_name(char const* argv);
+void* reading_function(void* fds);
+
+#define create_reading_thread(thd, read_fd, write_fd)           \
+                   pthread_create(&thd, NULL, reading_function, \
+                   (int[]) {read_fd, write_fd})
 
 #endif

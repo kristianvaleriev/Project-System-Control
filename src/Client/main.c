@@ -3,12 +3,16 @@
 #include "../../include/network.h"
 
 #include <sys/socket.h>
+#include <pthread.h>
 #include <unistd.h>
 
 #include "tty_conf.h"
 #include "client_networking.h"
 
 char* program_name = 0;
+
+void* server_reading(void*);
+
 
 int main(int argc, char** argv)
 {
@@ -36,7 +40,7 @@ int main(int argc, char** argv)
             err_sys("error on connection try (err num: %d)", server_socket);
     }
 
-    info_msg("connection successful");
+    info_msg("connection successful\n\n");
 
     if (set_tty_raw(STDIN_FILENO) < 0) 
         err_sys("could not set raw tty mode");
@@ -46,27 +50,17 @@ int main(int argc, char** argv)
     if (atexit(set_tty_atexit)) 
         err_sys("atexit failed");
 
+    pthread_t reading_thread;
+    create_reading_thread(reading_thread, server_socket, STDOUT_FILENO);
+
     while (1) 
     {
         char buf[128] = {0};
         ssize_t rc = read(STDIN_FILENO, buf, sizeof buf);
         if (rc < 0)
             err_info("read failed");
-        if (sendall(server_socket, buf, rc, 0) < 0)
+        if (send(server_socket, buf, rc, 0) < 0)
             err_info("sendall failed");
-
-        if (buf[0] == '\r') {
-            sleep(3);
-            break;
-        }
-    }
-
-    set_tty_user(STDIN_FILENO);
-    while (1)
-    {
-        char buf[128] = {0};
-        recv(server_socket, buf, sizeof buf, 0);
-        info_msg("recv buf: %.1000s", buf);
     }
 }
 

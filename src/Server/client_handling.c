@@ -3,9 +3,8 @@
 #include "../../include/utils.h"
 
 #include <pty.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "networking.h"
 #include "server_pty.h"
@@ -18,16 +17,27 @@ static char* shell_argv[] = {
 
 static int    handle_child_exec(int* fd);
 static int    init_logging_shell(int fd);
-static void*  shell_reading_thread(void*);
+
+static void   sigchld_handler(int signo)
+{
+    info_msg("a client has left");
+    exit(0);
+}
 
 void handle_client(int client_socket)
 {
+    struct sigaction sig_chld;
+    sig_chld.sa_handler = sigchld_handler;
+    sig_chld.sa_flags   = SA_NOCLDSTOP; // restart interupted syscalls
+    sigemptyset(&sig_chld.sa_mask);   // no need to turn off signals
+    if (sigaction(SIGCHLD, &sig_chld, NULL) < 0)
+        err_sys("sigaction failed");
+
     int master_fd;
     int shell_pid = handle_child_exec(&master_fd);
 
     pthread_t reading_thread;
-    pthread_create(&reading_thread, NULL, shell_reading_thread, 
-                   (int[]) {master_fd, client_socket});
+    create_reading_thread(reading_thread, master_fd, client_socket);
 
     int rc;
     while (1)
@@ -40,11 +50,11 @@ void handle_client(int client_socket)
             break;
         }
 
-        info_msg("data recieved: %s", buf);
-
         write(master_fd, buf, rc);
 
-        sleep(1);
+        // Was wondering why the server takes so long to respond 
+        // to user data and then I saw this:
+        //  sleep(1); 
     }
 }
 
@@ -65,6 +75,7 @@ static int handle_child_exec(int* fd)
     if (child_pid) {
         close(slave_pty);
         *fd = master_pty;
+
         return child_pid;
     }
     close(master_pty);
@@ -95,24 +106,3 @@ static int init_logging_shell(int fd)
     return -5;
 }
 
-void* shell_reading_thread(void* fd)
-{
-    int* master_fd = (int*) fd; 
-    int* client_socket = (int*) (fd + sizeof(int));
-
-    ssize_t size;
-    char buf[4098];
-    while (1)
-    {
-        if ((size = read(*master_fd, buf, sizeof buf)) < 0)
-            err_sys("read");
-
-        buf[size + 1] = '\0';
-        info_msg("sending buf: %s", buf);
-   
-        if (sendall(*client_socket, buf, size, 0) < 0)
-            err_sys("sendall");
-    }
-
-    return 0;
-}
