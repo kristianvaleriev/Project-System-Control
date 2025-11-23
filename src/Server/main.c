@@ -18,11 +18,11 @@
 #include "client_handling.h"
 
 
+char* program_name = 0;
+
 void    set_signals(void);
 void    sigchld_handler(int);
 void    fork_for_client(int,int);
-
-char* program_name = 0;
 
 int main(int argc, char** argv)
 {
@@ -45,7 +45,7 @@ int main(int argc, char** argv)
     set_signals();
     /*
      * Here I use a thread because:
-     *  - The job is very simple and lightweitgh
+     *  - The job is very simple and lightweight
      *  - The beacon has to be stopped on server exit which 
      *    would be very hard to do with a child proc.
      */
@@ -77,6 +77,9 @@ int main(int argc, char** argv)
 
 void fork_for_client(int listening_socket, int client_socket)
 {
+    static int user_counter = 0;
+    user_counter++;
+
     pid_t pid = fork();
     if (pid) {
         if (pid < 0)
@@ -92,6 +95,13 @@ void fork_for_client(int listening_socket, int client_socket)
      * so we gave it to our function to make posible freeing it.
      */
     close(listening_socket); 
+
+    char buf[8];
+    snprintf(buf, sizeof buf, "#%d", user_counter);
+    if (!(program_name = realloc(program_name, strlen(program_name) + strlen(buf)+1)))
+        err_sys("realloc");
+
+    strcat(program_name, buf);
 
     handle_client(client_socket);
 

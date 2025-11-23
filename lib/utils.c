@@ -9,7 +9,7 @@ char* set_program_name(char const* argv)
     char* ptr = strrchr(argv, '/');
     size_t offset = 0;
     if (ptr) {
-        offset = ptr - argv;
+        offset = ptr - argv + 1;
     } 
 
   extern char* program_name;

@@ -11,8 +11,7 @@
 
 char* program_name = 0;
 
-void* server_reading(void*);
-
+int handle_connection_socket(char* server_addr, size_t addr_size);
 
 int main(int argc, char** argv)
 {
@@ -20,28 +19,14 @@ int main(int argc, char** argv)
     info_msg("beginning multicast search");
 
     char server_addr[128];
-    int multicast_status=  multicast_recv_def(server_addr, sizeof server_addr);
+    int multicast_status =  multicast_recv_def(server_addr, sizeof server_addr);
     if (multicast_status)
         err_sys("multicast receiver failed (err num: %d)", multicast_status);
 
     //print_ip_addr(&server_addr, "got server ip: %s", info_msg);
     info_msg("got server ip: %s", server_addr);
-
-    int server_socket = get_connected_socket(server_addr, sizeof server_addr);
-    if (server_socket < 0) 
-    {
-        if (server_socket == ERR_GETADDRINFO) {
-            err_quit_msg("getaddrinfo error: %s", gai_strerror(server_socket));
-        }
-        else if (server_socket == ERR_CONNECT){
-            err_sys("connection call failed");
-        }
-        else 
-            err_sys("error on connection try (err num: %d)", server_socket);
-    }
-
-    info_msg("connection successful\n\n");
-
+    int server_socket = handle_connection_socket(server_addr, sizeof server_addr);
+    
     if (set_tty_raw(STDIN_FILENO) < 0) 
         err_sys("could not set raw tty mode");
 
@@ -64,3 +49,21 @@ int main(int argc, char** argv)
     }
 }
 
+int handle_connection_socket(char* server_addr, size_t addr_size) 
+{
+    int server_socket = get_connected_socket(server_addr, addr_size);
+    if (server_socket < 0) 
+    {
+        if (server_socket == ERR_GETADDRINFO) {
+            err_quit_msg("getaddrinfo error: %s", gai_strerror(server_socket));
+        }
+        else if (server_socket == ERR_CONNECT){
+            err_sys("connection call failed");
+        }
+        else 
+            err_sys("error on connection try (err num: %d)", server_socket);
+    }
+
+    info_msg("connection successful\n\n");
+    return server_socket;
+}

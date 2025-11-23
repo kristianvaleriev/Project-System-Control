@@ -15,23 +15,19 @@ static char* shell_argv[] = {
     NULL
 };
 
+static void   set_signals(void);
 static int    handle_child_exec(int* fd);
 static int    init_logging_shell(int fd);
 
 static void   sigchld_handler(int signo)
 {
-    info_msg("a client has left");
+    info_msg("client has left");
     exit(0);
 }
 
 void handle_client(int client_socket)
 {
-    struct sigaction sig_chld;
-    sig_chld.sa_handler = sigchld_handler;
-    sig_chld.sa_flags   = SA_NOCLDSTOP; // restart interupted syscalls
-    sigemptyset(&sig_chld.sa_mask);   // no need to turn off signals
-    if (sigaction(SIGCHLD, &sig_chld, NULL) < 0)
-        err_sys("sigaction failed");
+    set_signals();
 
     int master_fd;
     int shell_pid = handle_child_exec(&master_fd);
@@ -106,3 +102,12 @@ static int init_logging_shell(int fd)
     return -5;
 }
 
+void set_signals(void)
+{
+    struct sigaction sig_chld;
+    sig_chld.sa_handler = sigchld_handler;
+    sig_chld.sa_flags   = SA_NOCLDSTOP; // restart interupted syscalls
+    sigemptyset(&sig_chld.sa_mask);   // no need to turn off signals
+    if (sigaction(SIGCHLD, &sig_chld, NULL) < 0)
+        err_sys("sigaction failed");
+}

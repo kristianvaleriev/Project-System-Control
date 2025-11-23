@@ -63,7 +63,7 @@ ssize_t sendall(int socket, void* buf, size_t bytes, int flags)
 *
 * This code was written by me so so long ago... (january 2025 :)) that I have forgotten most of it
 * and I am too lazy and too out of time for rewrite or even looking at it so I hope most of it 
-* is fine (altho it looks terrible). So far it works, how? Idk, I forgot. Maybe one day I will
+* is fine (although it looks terrible). So far it works, how? Idk, I forgot. Maybe one day I will
 * upgrade it.
 */
 #define MULTICAST_ADDR "239.255.255.250"
