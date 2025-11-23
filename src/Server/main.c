@@ -18,9 +18,9 @@
 #include "client_handling.h"
 
 
-void    fork_for_client(int,int);
-void    sigchld_handler(int);
 void    set_signals(void);
+void    sigchld_handler(int);
+void    fork_for_client(int,int);
 
 char* program_name = 0;
 

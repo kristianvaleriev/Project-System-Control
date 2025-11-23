@@ -41,7 +41,7 @@ ssize_t sendall(int socket, void* buf, size_t bytes, int flags)
 {
     ssize_t sent  = 0;
     size_t offset = 0;
-    while ((sent = send(socket, buf + offset, bytes, flags) != bytes))
+    while ((sent = send(socket, buf + offset, bytes, flags) != (ssize_t) bytes))
     {
         if (sent < 0)
             break;
@@ -49,7 +49,7 @@ ssize_t sendall(int socket, void* buf, size_t bytes, int flags)
         bytes  -= offset;
     }
 
-    return (offset) ? sent : -1;
+    return (offset) ? -1 : sent;
 }
 
 // MULTICAST FUNCTIONS AND MACROS

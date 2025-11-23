@@ -126,7 +126,7 @@ void* multicast_beacon(void* _)
       #else
         multicast_send(p_addr, strlen(p_addr));
       #endif
-        sleep(5);
+        sleep(2);
     }
 
     // Probably wont happened but still...

@@ -3,6 +3,7 @@
 #include "../../include/network.h"
 
 #include <sys/socket.h>
+#include <unistd.h>
 
 #include "tty_conf.h"
 #include "client_networking.h"
@@ -41,9 +42,31 @@ int main(int argc, char** argv)
         err_sys("could not set raw tty mode");
 
     // Very funny if that here is missing (bad tho :\)
-    // *resets terminal to original state*
+    // *resets terminal to it's original state*
     if (atexit(set_tty_atexit)) 
         err_sys("atexit failed");
 
+    while (1) 
+    {
+        char buf[128] = {0};
+        ssize_t rc = read(STDIN_FILENO, buf, sizeof buf);
+        if (rc < 0)
+            err_info("read failed");
+        if (sendall(server_socket, buf, rc, 0) < 0)
+            err_info("sendall failed");
+
+        if (buf[0] == '\r') {
+            sleep(3);
+            break;
+        }
+    }
+
+    set_tty_user(STDIN_FILENO);
+    while (1)
+    {
+        char buf[128] = {0};
+        recv(server_socket, buf, sizeof buf, 0);
+        info_msg("recv buf: %.1000s", buf);
+    }
 }
 

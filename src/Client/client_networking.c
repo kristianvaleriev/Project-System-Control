@@ -37,7 +37,7 @@ int get_connected_socket(void* addr, size_t size)
     {
         socket_ret = socket(temp_ai->ai_family, SOCK_STREAM, temp_ai->ai_protocol);
         if (socket_ret >= 0) {
-            if (!(socket_ret = connect(socket_ret, temp_ai->ai_addr, temp_ai->ai_addrlen)))
+            if (!connect(socket_ret, temp_ai->ai_addr, temp_ai->ai_addrlen))
                 break;
             else socket_ret = ERR_CONNECT;
         }
