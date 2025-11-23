@@ -1,7 +1,9 @@
 #include "../../include/includes.h"
 #include "../../include/utils.h"
 
-#include "daemon.h"
+#include "daemoned.h"
+
+// Old code again, sorry...
 
 void daemonize()
 {
@@ -10,7 +12,8 @@ void daemonize()
 	int pid = fork();
 	ERR_SYSCALL(pid, "fork");
 
-	if (pid != 0) exit(0);
+	if (pid) 
+        exit(0);
 	setsid();
 
 	struct sigaction sa;
