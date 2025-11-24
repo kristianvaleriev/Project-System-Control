@@ -27,13 +27,17 @@ void* reading_function(void* fds)
     char buf[4098];
     while (1)
     {
-        if ((size = read(*read_fd, buf, sizeof buf)) < 0)
-            err_sys("reading function's read fail");
+        if ((size = read(*read_fd, buf, sizeof buf)) < 0) {
+            err_info("reading function's read fail");
+            break;
+        }
         buf[size] = '\0';
         //info_msg("sending buf: %s", buf);
-   
-        if (write(*write_fd, buf, size) < 0)
-            err_sys("reading function's write fail");
+
+        if (write(*write_fd, buf, size) < 0) {
+            err_info("reading function's write fail");
+            break;
+        }
     }
 
     return 0;

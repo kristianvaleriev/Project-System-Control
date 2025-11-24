@@ -11,7 +11,8 @@
 
 char* program_name = 0;
 
-int handle_connection_socket(char* server_addr, size_t addr_size);
+int     handle_connection_socket(char* server_addr, size_t addr_size);
+void*   reading_server_function(void*);
 
 int main(int argc, char** argv)
 {
@@ -36,7 +37,8 @@ int main(int argc, char** argv)
         err_sys("atexit failed");
 
     pthread_t reading_thread;
-    create_reading_thread(reading_thread, server_socket, STDOUT_FILENO);
+    pthread_create(&reading_thread, NULL, reading_server_function,
+                   (int[]) {server_socket, STDOUT_FILENO});
 
     while (1) 
     {
@@ -44,9 +46,14 @@ int main(int argc, char** argv)
         ssize_t rc = read(STDIN_FILENO, buf, sizeof buf);
         if (rc < 0)
             err_info("read failed");
-        if (send(server_socket, buf, rc, 0) < 0)
-            err_info("sendall failed");
+
+        if (send(server_socket, buf, rc, MSG_NOSIGNAL) < 0)
+            break;
     }
+    info_msg("exiting...\n\n");
+
+
+    exit(0);
 }
 
 int handle_connection_socket(char* server_addr, size_t addr_size) 
