@@ -16,6 +16,7 @@
 
 #include "networking.h"
 #include "client_handling.h"
+#include "daemoned.h"
 
 
 char* program_name = 0;
@@ -31,8 +32,10 @@ int main(int argc, char** argv)
     set_program_name(argv[0]);
 
     // strcmp ALSO DOESN'T check for NULL......
-    if (argv[1] && !strcmp(argv[1], "--daemoned"))
+    if (argv[1] && !strcmp(argv[1], "--daemoned")) {
         init_syslog(program_name, LOG_CONS, LOG_DAEMON);
+        daemonize();
+    }
         
     int listening_socket = get_listening_socket(&server_ip);
     if (listening_socket < 0) {
@@ -47,7 +50,7 @@ int main(int argc, char** argv)
      * Here I use a thread because:
      *  - The job is very simple and lightweight
      *  - The beacon has to be stopped on server exit which 
-     *    would be very hard to do with a child proc.
+     *    would be difficult to do with a child proc.
      */
     pthread_t beacon_thread;
     pthread_create(&beacon_thread, 0, multicast_beacon, NULL);

@@ -23,7 +23,7 @@ int priority = LOG_NOTICE;
 
 void init_syslog(char* name, int option, int facility)
 {
-    open(name, option, facility);
+    openlog(name, option, facility);
     is_daemon = 1;
 }
 
