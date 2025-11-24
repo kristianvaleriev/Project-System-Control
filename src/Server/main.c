@@ -32,6 +32,7 @@ int main(int argc, char** argv)
     set_program_name(argv[0]);
 
     // strcmp ALSO DOESN'T check for NULL......
+    // (makes sence; what would return if NULL after all, but still.)
     if (argv[1] && !strcmp(argv[1], "--daemoned")) {
         init_syslog(program_name, LOG_CONS, LOG_DAEMON);
         daemonize();

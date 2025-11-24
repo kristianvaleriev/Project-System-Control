@@ -38,14 +38,49 @@ static DIR* check_dir(char* dirname, char* path)
 
 static int open_lockdir(void)
 {
-	char path_fmt[256] = "/var/run/user/";
-	strcat(path_fmt, "%u/");
-
-	char path[256];
+	char path_fmt[128] = "/var/run/user/%u/";
+	char path[128] = {0};
 	snprintf(path, sizeof path, path_fmt, geteuid());
     
-    extern char* program_name;
 	return dirfd(check_dir(program_name, path));
+}
+
+int lock_daemon(void)
+{
+	int lock_dir = open_lockdir();
+	if (lock_dir < 0)
+        err_sys("can't open user lock directory");
+
+	int fd = openat(lock_dir, "lock.pid", O_RDWR | O_CREAT, 0644);
+	if (fd < 0)
+        err_sys("can't open lock file");
+	
+	struct flock fl;
+	fl.l_whence = SEEK_SET;
+	fl.l_type   = F_WRLCK;
+	fl.l_start  = 0;
+	fl.l_len 	= 0;
+
+    int ret = 0;
+
+	if (fcntl(fd, F_SETLK, &fl) < 0) {
+		if (errno == EACCES || errno == EAGAIN) {
+			ret = 1;
+			goto RET;
+		}
+		err_sys("fctnl");
+	}
+	ftruncate(fd, 0);
+
+	char buf[16] = {0};
+	sprintf(buf, "%ld", (long) getpid());
+	write(fd, buf, strlen(buf) + 1);
+
+  RET: 
+    close(fd);
+    close(lock_dir);
+
+    return ret;
 }
 
 void daemonize(void)
@@ -88,43 +123,5 @@ void daemonize(void)
 
     if (lock_daemon() == 1)
         err_quit_msg("daemoned already running");
-}
-
-int lock_daemon(void)
-{
-	int lock_dir = open_lockdir();
-	if (lock_dir < 0)
-        err_sys("can't open user lock directory");
-
-	int fd = openat(lock_dir, "lock.pid", O_RDWR | O_CREAT, 0644);
-	if (fd < 0)
-        err_sys("can't open lock file");
-	
-	struct flock fl;
-	fl.l_whence = SEEK_SET;
-	fl.l_start  = 0;
-	fl.l_len 	= 0;
-	fl.l_type   = F_WRLCK;
-
-    int ret = 0;
-
-	if (fcntl(fd, F_SETLK, &fl) < 0) {
-		if (errno == EACCES || errno == EAGAIN) {
-			ret = 1;
-			goto RET;
-		}
-		err_sys("fctnl");
-	}
-
-	ftruncate(fd, 0);
-	char buf[16] = {0};
-	sprintf(buf, "%ld", (long) getpid());
-	write(fd, buf, strlen(buf) + 1);
-
-  RET: 
-    close(fd);
-    close(lock_dir);
-
-    return ret;
 }
 
