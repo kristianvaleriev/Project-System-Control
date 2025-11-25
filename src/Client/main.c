@@ -3,14 +3,17 @@
 #include "../../include/network.h"
 
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <termios.h>
 
 #include "tty_conf.h"
 #include "client_networking.h"
 
 char* program_name = 0;
 
+void    main_cmd_loop(int server_socket);
 int     handle_connection_socket(char* server_addr, size_t addr_size);
 void*   reading_server_function(void*);
 
@@ -36,24 +39,45 @@ int main(int argc, char** argv)
     if (atexit(set_tty_atexit)) 
         err_sys("atexit failed");
 
+    struct winsize wins; 
+    ioctl(STDIN_FILENO, TIOCGWINSZ, &wins);
+    struct client_request req = {
+        .data_size = htonl(sizeof wins),
+        .type      = htonl(TYPE_WINSIZE),
+    };
+
+    info_msg("col & rows: %d %d\n\r", wins.ws_col, wins.ws_row);
+    sendall(server_socket, &req,  sizeof req, 0);
+    sendall(server_socket, &wins, sizeof wins, 0);
+    
     pthread_t reading_thread;
     pthread_create(&reading_thread, NULL, reading_server_function,
                    (int[]) {server_socket, STDOUT_FILENO});
 
+    main_cmd_loop(server_socket);
+
+
+    info_msg("exiting...\n\n");
+    exit(0);
+}
+
+void main_cmd_loop(int server_socket)
+{
+    char buf[128] = {0};
+    size_t offset = sizeof(struct client_request);
+    char*  write_buf = buf + offset;
+    size_t sizeof_buf = (sizeof buf) - offset;
+
+    ssize_t rc;
     while (1) 
     {
-        char buf[128] = {0};
-        ssize_t rc = read(STDIN_FILENO, buf, sizeof buf);
+        rc = read(STDIN_FILENO, write_buf, sizeof_buf);
         if (rc < 0)
             err_info("read failed");
 
-        if (send(server_socket, buf, rc, MSG_NOSIGNAL) < 0)
+        if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) < 0)
             break;
     }
-    info_msg("exiting...\n\n");
-
-
-    exit(0);
 }
 
 int handle_connection_socket(char* server_addr, size_t addr_size) 

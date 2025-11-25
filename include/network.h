@@ -20,13 +20,25 @@ int    multicast_recv(char* group, int domain, int port,
 #define multicast_init_def() multicast_init(0,0,0)
 #define multicast_recv_def(buf, len) multicast_recv(0, 0, 0, buf, len)
 
+// Utils
 void*   convert_addr(struct sockaddr* addr);
 void    print_ip_addr(void* sock_addr, char* msg, 
                       void (*print_fn)(const char* fmt, ...));
 ssize_t sendall(int socket, void* buf, size_t bytes, int flags);
 
 
-int     send_errmsg(int fd, char* msg);
-int     send_errno(int fd);
+// Request protocol
+
+typedef enum {
+    TYPE_COMMAND,
+    TYPE_FILES,
+    TYPE_DRIVERS,
+    TYPE_WINSIZE,
+} reqtype_e; 
+
+struct client_request {
+    uint32_t data_size; // 0 if shell cmd
+    reqtype_e type; 
+};
 
 #endif

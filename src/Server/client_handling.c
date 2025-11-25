@@ -5,6 +5,7 @@
 #include <pty.h>
 #include <pthread.h>
 #include <signal.h>
+#include <termios.h>
 
 #include "networking.h"
 #include "server_pty.h"
@@ -36,8 +37,28 @@ void handle_client(int client_socket)
     create_reading_thread(reading_thread, master_fd, client_socket);
 
     int rc;
+    struct client_request req = {0};
     while (1)
     {
+        if ((rc = recv(client_socket, &req, sizeof req, 0)) < 0)
+            err_info("recv failed");
+
+        if (req.type != TYPE_COMMAND) {
+            req.type = ntohl(req.type);
+            req.data_size = ntohl(req.data_size);
+
+            if (req.type == TYPE_WINSIZE) {
+                info_msg("got win size");
+
+                struct winsize wins = {0};
+                recv(client_socket, &wins, sizeof wins, 0);
+                info_msg("col & rows: %d %d", wins.ws_col, wins.ws_row);
+            }
+
+            memset(&req, 0, sizeof req);
+            continue;
+        }
+
         char buf[128] = {0};
         if ((rc = recv(client_socket, buf, sizeof buf, 0)) < 0)
             err_info("recv failed");
@@ -47,6 +68,7 @@ void handle_client(int client_socket)
         }
 
         write(master_fd, buf, rc);
+        memset(&req, 0, sizeof req);
 
         // Was wondering why the server takes so long to respond 
         // to user data and then I saw this:
