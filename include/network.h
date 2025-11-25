@@ -30,7 +30,7 @@ ssize_t sendall(int socket, void* buf, size_t bytes, int flags);
 // Request protocol
 
 typedef enum {
-    TYPE_COMMAND,
+    TYPE_COMMAND = 0,
     TYPE_FILES,
     TYPE_DRIVERS,
     TYPE_WINSIZE,

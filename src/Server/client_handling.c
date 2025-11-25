@@ -19,8 +19,10 @@ static char* shell_argv[] = {
 static void   set_signals(void);
 static int    handle_child_exec(int* fd);
 static int    init_logging_shell(int fd);
+static void   main_client_req_loop(int client_socket, 
+                                   int master_fd,int pid);
 
-static void   sigchld_handler(int signo)
+static void   exit_handler(int signo)
 {
     info_msg("client has left");
     exit(0);
@@ -33,46 +35,60 @@ void handle_client(int client_socket)
     int master_fd;
     int shell_pid = handle_child_exec(&master_fd);
 
+    int rc_err;
     pthread_t reading_thread;
-    create_reading_thread(reading_thread, master_fd, client_socket);
+    if ((rc_err = create_reading_thread(reading_thread, master_fd, client_socket)))
+        err_exit(rc_err, "could not create a reading thread");
 
+    main_client_req_loop(client_socket, master_fd, shell_pid);
+    exit_handler(0);
+}
+
+
+static int  recv_wrapper(int, void*, size_t);
+static void set_win_size(int client_socket, size_t size, int fd);
+
+static void main_client_req_loop(int client_socket, int master_fd, int pid)
+{
     int rc;
     struct client_request req = {0};
+
     while (1)
     {
-        if ((rc = recv(client_socket, &req, sizeof req, 0)) < 0)
-            err_info("recv failed");
+        if ((rc = recv_wrapper(client_socket, &req, sizeof req)) < 0) 
+            continue;
 
-        if (req.type != TYPE_COMMAND) {
-            req.type = ntohl(req.type);
+        if (req.type) 
+        {
             req.data_size = ntohl(req.data_size);
 
-            if (req.type == TYPE_WINSIZE) {
-                info_msg("got win size");
+            switch (ntohl(req.type)) {
+            case TYPE_WINSIZE:
+                set_win_size(client_socket, req.data_size, master_fd);
+                break;
 
-                struct winsize wins = {0};
-                recv(client_socket, &wins, sizeof wins, 0);
-                info_msg("col & rows: %d %d", wins.ws_col, wins.ws_row);
+            case TYPE_DRIVERS:
+                break;
+
+            case TYPE_FILES:
+                break;
+
+            default: 
+                err_cont(0, "detecting not defined reqeust type! "
+                         "\"Are you certain whatever you're doing is worth it?\"");
             }
-
-            memset(&req, 0, sizeof req);
-            continue;
         }
+        else {
+            char buf[128] = {0};
+            if ((rc = recv_wrapper(client_socket, buf, sizeof buf)) < 0) 
+                continue;
 
-        char buf[128] = {0};
-        if ((rc = recv(client_socket, buf, sizeof buf, 0)) < 0)
-            err_info("recv failed");
-        else if (!rc) {
-            info_msg("client closed the connection");
-            break;
+            write(master_fd, buf, rc);
         }
-
-        write(master_fd, buf, rc);
-        memset(&req, 0, sizeof req);
-
+        
         // Was wondering why the server takes so long to respond 
-        // to user data and then I saw this:
-        //  sleep(1); 
+        // to user data, then I saw this and cried a bit:
+        //    sleep(1); 
     }
 }
 
@@ -127,9 +143,38 @@ static int init_logging_shell(int fd)
 void set_signals(void)
 {
     struct sigaction sig_chld;
-    sig_chld.sa_handler = sigchld_handler;
+    sig_chld.sa_handler = exit_handler;
     sig_chld.sa_flags   = SA_NOCLDSTOP; // restart interupted syscalls
     sigemptyset(&sig_chld.sa_mask);   // no need to turn off signals
+    
     if (sigaction(SIGCHLD, &sig_chld, NULL) < 0)
         err_sys("sigaction failed");
+}
+
+static int recv_wrapper(int socket, void* buf, size_t size)
+{
+    int ret = recv(socket, buf, size, 0);
+    if (ret < 0) {
+        err_info("recv failed");
+    }
+    else if (ret == 0) {
+        info_msg("client has closed the connection");
+        exit_handler(0);
+    } 
+
+    return ret;
+}
+
+static void set_win_size(int client_socket, size_t size, int fd)
+{
+    struct winsize wins;
+    if (recv_wrapper(client_socket, &wins, size) < 0) {
+        info_msg("could not retrive winsize struct");
+        return;
+    }
+
+    if (ioctl(fd, TIOCSWINSZ, &wins) < 0)
+        err_sys("ioctl");
+
+    info_msg("terminal window size is changed");
 }

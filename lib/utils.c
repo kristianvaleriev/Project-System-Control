@@ -2,6 +2,7 @@
 #include "../include/utils.h"
 
 #include <pthread.h>
+#include <errno.h>
 
 char* set_program_name(char const* argv)
 {
@@ -28,7 +29,10 @@ void* reading_function(void* fds)
     while (1)
     {
         if ((size = read(*read_fd, buf, sizeof buf)) < 0) {
-            err_info("reading function's read fail");
+            if (errno == EIO)
+                err_cont(0, "EIO");
+            else
+                err_info("reading function's read fail");
             break;
         }
         buf[size] = '\0';
@@ -42,3 +46,5 @@ void* reading_function(void* fds)
 
     return 0;
 }
+
+

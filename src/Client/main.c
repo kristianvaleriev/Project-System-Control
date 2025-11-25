@@ -3,6 +3,7 @@
 #include "../../include/network.h"
 
 #include <sys/socket.h>
+#include <sys/signal.h>
 #include <sys/ioctl.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -13,9 +14,14 @@
 
 char* program_name = 0;
 
-void    main_cmd_loop(int server_socket);
+static int __server_socket = -1;
+
+
 int     handle_connection_socket(char* server_addr, size_t addr_size);
 void*   reading_server_function(void*);
+void    send_winsize_info(int);
+void    set_signals(void);
+void    main_cmd_loop(int);
 
 int main(int argc, char** argv)
 {
@@ -27,9 +33,9 @@ int main(int argc, char** argv)
     if (multicast_status)
         err_sys("multicast receiver failed (err num: %d)", multicast_status);
 
-    //print_ip_addr(&server_addr, "got server ip: %s", info_msg);
     info_msg("got server ip: %s", server_addr);
     int server_socket = handle_connection_socket(server_addr, sizeof server_addr);
+    __server_socket = server_socket; // no choice :(( 
     
     if (set_tty_raw(STDIN_FILENO) < 0) 
         err_sys("could not set raw tty mode");
@@ -39,20 +45,12 @@ int main(int argc, char** argv)
     if (atexit(set_tty_atexit)) 
         err_sys("atexit failed");
 
-    struct winsize wins; 
-    ioctl(STDIN_FILENO, TIOCGWINSZ, &wins);
-    struct client_request req = {
-        .data_size = htonl(sizeof wins),
-        .type      = htonl(TYPE_WINSIZE),
-    };
-
-    info_msg("col & rows: %d %d\n\r", wins.ws_col, wins.ws_row);
-    sendall(server_socket, &req,  sizeof req, 0);
-    sendall(server_socket, &wins, sizeof wins, 0);
-    
+    send_winsize_info(0);
+    set_signals();
+       
     pthread_t reading_thread;
     pthread_create(&reading_thread, NULL, reading_server_function,
-                   (int[]) {server_socket, STDOUT_FILENO});
+                   (int[]) {server_socket, STDOUT_FILENO, 1});
 
     main_cmd_loop(server_socket);
 
@@ -80,6 +78,27 @@ void main_cmd_loop(int server_socket)
     }
 }
 
+void send_winsize_info(int _)
+{
+    if (!isatty(STDIN_FILENO))
+        return;
+
+    struct winsize win; 
+    if (ioctl(STDIN_FILENO, TIOCGWINSZ, &win) < 0) {
+        err_info("error on retriving window size");
+        return;
+    }
+    struct client_request req = {
+        .data_size = htonl(sizeof win),
+        .type      = htonl(TYPE_WINSIZE),
+    };
+
+    //info_msg("col & rows: %d %d\n\r", wins.ws_col, wins.ws_row);
+    if (sendall(__server_socket, &req, sizeof req, 0) < 0 ||       
+        sendall(__server_socket, &win, sizeof win, 0) < 0)
+        err_info("error on sending request for changing window size");
+}
+
 int handle_connection_socket(char* server_addr, size_t addr_size) 
 {
     int server_socket = get_connected_socket(server_addr, addr_size);
@@ -99,6 +118,8 @@ int handle_connection_socket(char* server_addr, size_t addr_size)
     return server_socket;
 }
 
+// Tried to used the util threaded function, but it is too
+// different and it would be a mess.
 void* reading_server_function(void* fds)
 {
     int* server_socket = (int*) fds;
@@ -126,4 +147,15 @@ void* reading_server_function(void* fds)
         }
     }
     return 0;
+}
+
+void set_signals(void)
+{
+    struct sigaction sa;
+    sa.sa_handler = send_winsize_info;
+    sa.sa_flags   = SA_RESTART; // restart interupted syscalls
+    sigemptyset(&sa.sa_mask);   // no need to turn off signals
+
+    if (sigaction(SIGWINCH, &sa, NULL) < 0)
+        err_sys("sigaction failed");
 }
