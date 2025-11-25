@@ -61,12 +61,11 @@ int lock_daemon(void)
 	fl.l_start  = 0;
 	fl.l_len 	= 0;
 
-    int ret = 0;
-
 	if (fcntl(fd, F_SETLK, &fl) < 0) {
 		if (errno == EACCES || errno == EAGAIN) {
-			ret = 1;
-			goto RET;
+            close(fd);
+            close(lock_dir);
+            return 1;
 		}
 		err_sys("fctnl");
 	}
@@ -76,11 +75,7 @@ int lock_daemon(void)
 	sprintf(buf, "%ld", (long) getpid());
 	write(fd, buf, strlen(buf) + 1);
 
-  RET: 
-    close(fd);
-    close(lock_dir);
-
-    return ret;
+    return 0;
 }
 
 void daemonize(void)
