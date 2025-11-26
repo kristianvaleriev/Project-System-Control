@@ -43,6 +43,7 @@ int get_connected_socket(void* addr, size_t size)
         }
         else socket_ret = ERR_SOCKET;
     }
+    freeaddrinfo(result);
 
     return socket_ret;
 }

@@ -9,7 +9,7 @@
 #include <sys/types.h> // My blasted LSP requires it, else there are lots of errors. Remove at the end.
 #include <netdb.h>
 
-#define KNOWN_PORT "15131"
+#define KNOWN_PORT "7932"
 
 int    multicast_init(char* addr, int domain, int port);
 void   multicast_dealloc(void);
