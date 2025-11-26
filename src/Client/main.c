@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <termios.h>
+#include <errno.h>
 
 #include "tty_conf.h"
 #include "client_networking.h"
@@ -28,7 +29,7 @@ int main(int argc, char** argv)
     set_program_name(argv[0]);
     info_msg("beginning multicast search");
 
-    char server_addr[128];
+    char server_addr[128] = {0};
     int multicast_status =  multicast_recv_def(server_addr, sizeof server_addr);
     if (multicast_status)
         err_sys("multicast receiver failed (err num: %d)", multicast_status);
@@ -108,7 +109,7 @@ int handle_connection_socket(char* server_addr, size_t addr_size)
             err_quit_msg("getaddrinfo error: %s", gai_strerror(server_socket));
         }
         else if (server_socket == ERR_CONNECT){
-            err_sys("connection call failed");
+            err_sys("connection call failed (errno: %d)", errno);
         }
         else 
             err_sys("error on connection try (err num: %d)", server_socket);
