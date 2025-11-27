@@ -19,8 +19,8 @@ int get_listening_socket(struct addrinfo* binded_ai)
 {
     struct addrinfo hint, *result, *temp_ai;
     memset(&hint, 0, sizeof hint);
-    hint.ai_family   = AF_UNSPEC;  // Either IPv4 or v6, doesn't mather.
     hint.ai_socktype = SOCK_STREAM;// TCP please.
+    hint.ai_family   = AF_UNSPEC;  // Either IPv4 or v6, doesn't mather.
     hint.ai_flags    = AI_PASSIVE; // Give me an IP.
 
     if ((errno = getaddrinfo(NULL, KNOWN_PORT, &hint, &result))) 

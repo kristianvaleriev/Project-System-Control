@@ -2,6 +2,7 @@
 #include "../../include/utils.h"
 #include "../../include/network.h"
 
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/signal.h>
 #include <sys/ioctl.h>
@@ -9,13 +10,21 @@
 #include <unistd.h>
 #include <termios.h>
 #include <errno.h>
+#include <getopt.h>
 
 #include "tty_conf.h"
 #include "client_networking.h"
 
-char* program_name = 0;
+#define SHORT_ARGS "a:"
+static struct option long_options[] = {
+    { "address", required_argument, NULL, 'a'},
+    {},
+};
+
 
 static int __server_socket = -1;
+
+char* program_name = 0;
 
 
 int     handle_connection_socket(char* server_addr, size_t addr_size);
@@ -26,15 +35,35 @@ void    main_cmd_loop(int);
 
 int main(int argc, char** argv)
 {
+    char* server_addr = NULL;
     set_program_name(argv[0]);
-    info_msg("beginning multicast search");
 
-    char server_addr[128] = {0};
-    int multicast_status =  multicast_recv_def(server_addr, sizeof server_addr);
-    if (multicast_status)
-        err_sys("multicast receiver failed (err num: %d)", multicast_status);
+    char ch_arg;
+    while ((ch_arg = getopt_long(argc, argv, SHORT_ARGS, long_options, NULL)) != -1)
+    {
+        switch (ch_arg) {
+        case 'a': 
+            if (validate_ip_address(optarg))
+                server_addr = strdup(optarg);
+            else 
+                info_msg("given an invalid ip address\n");
+        }
+    }
 
-    info_msg("got server ip: %s", server_addr);
+    if (!server_addr) 
+    {
+        server_addr = malloc(INET6_ADDRSTRLEN);
+        if (!server_addr)
+            err_sys("malloc failed");
+
+        info_msg("beginning multicast search");
+        int multicast_status =  multicast_recv_def(server_addr, INET6_ADDRSTRLEN);
+        if (multicast_status)
+            err_sys("multicast receiver failed (err num: %d)", multicast_status);
+
+        info_msg("got server ip: %s", server_addr);
+    }
+
     int server_socket = handle_connection_socket(server_addr, sizeof server_addr);
     __server_socket = server_socket; // no choice :(( 
     
@@ -53,6 +82,7 @@ int main(int argc, char** argv)
     pthread_create(&reading_thread, NULL, reading_server_function,
                    (int[]) {server_socket, STDOUT_FILENO, 1});
 
+    free(server_addr);
     main_cmd_loop(server_socket);
 
 

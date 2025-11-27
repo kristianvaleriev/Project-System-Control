@@ -219,6 +219,9 @@ int multicast_recv(char* group, int domain, int port,
     if (recv_bytes < 0) 
         return -4;
 
+    if (recv_bytes < buf_len)
+        ((char*) buf)[recv_bytes] = '\0'; //pain...necessary
+
     close(recv_socket);
     return 0;
 }

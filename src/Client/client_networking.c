@@ -3,6 +3,7 @@
 #include "../../include/utils.h"
 
 #include <asm-generic/socket.h>
+#include <bits/getopt_core.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -47,4 +48,14 @@ int get_connected_socket(void* addr, size_t size)
     freeaddrinfo(result);
 
     return socket_ret;
+}
+
+int validate_ip_address(char *ptr)
+{
+    struct sockaddr_storage temp;
+    if (inet_pton(AF_INET , ptr, &temp) ||
+        inet_pton(AF_INET6, ptr, &temp))
+        return 1;
+
+    return 0;
 }

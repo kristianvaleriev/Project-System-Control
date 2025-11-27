@@ -8,5 +8,6 @@
 #define ERR_CONNECT     -3
 
 int   get_connected_socket(void* addr, size_t);
+int   validate_ip_address(char* ptr);
 
 #endif
