@@ -7,6 +7,7 @@
 #include <sys/signal.h>
 #include <sys/ioctl.h>
 #include <pthread.h>
+#include <time.h>
 #include <unistd.h>
 #include <termios.h>
 #include <errno.h>
@@ -14,10 +15,13 @@
 
 #include "tty_conf.h"
 #include "client_networking.h"
+#include "dynamic_files.h"
 
-#define SHORT_ARGS "a:"
+#define SHORT_ARGS "-a:f:d:"
 static struct option long_options[] = {
-    { "address", required_argument, NULL, 'a'},
+    { "address",  required_argument, NULL, 'a'},
+    { "files",    required_argument, NULL, 'f'},
+    { "drivers",  required_argument, NULL, 'd'},
     {},
 };
 
@@ -36,9 +40,13 @@ void    main_cmd_loop(int);
 int main(int argc, char** argv)
 {
     char* server_addr = NULL;
+    struct filename_array* drivers = init_filename_array();
+    struct filename_array* files   = init_filename_array();
+
     set_program_name(argv[0]);
 
-    char ch_arg;
+  {
+    char ch_arg, temp = 0; 
     while ((ch_arg = getopt_long(argc, argv, SHORT_ARGS, long_options, NULL)) != -1)
     {
         switch (ch_arg) {
@@ -46,10 +54,28 @@ int main(int argc, char** argv)
             if (validate_ip_address(optarg))
                 server_addr = strdup(optarg);
             else 
-                info_msg("given an invalid ip address\n");
-        }
-    }
+                err_quit_msg("given an invalid ip address");
+        break;
 
+        case 'f': insert_in_array(files,optarg, strlen(optarg));
+        break;
+
+        case 'd': insert_in_array(drivers, optarg, strlen(optarg));
+        break;
+
+        case 1:
+            if (temp == 'f')
+                insert_in_array(files, optarg, strlen(optarg));
+            else if (temp == 'd')
+                insert_in_array(drivers, optarg, strlen(optarg));
+            else 
+                info_msg("unrecognized option's argument");
+        continue;
+        }
+
+        temp = ch_arg;
+    }
+  }
     if (!server_addr) 
     {
         server_addr = malloc(INET6_ADDRSTRLEN);

@@ -103,9 +103,7 @@ static int handle_child_exec(int* fd)
     if (child_pid < 0)
         err_sys("fork error");
     
-    /*
-    * Parent returns here ::
-    */
+    //Parent returns here ::
     if (child_pid) {
         close(slave_pty);
         *fd = master_pty;
