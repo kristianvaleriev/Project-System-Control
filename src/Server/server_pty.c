@@ -1,5 +1,6 @@
 #include "../../include/includes.h"
 #include "../../include/utils.h"
+#include "../../include/network.h"
 
 #include <asm-generic/ioctls.h>
 #include <fcntl.h>
@@ -35,3 +36,19 @@ void set_control_terminal(int term_fd, char* path)
     
     close(fd);
 }
+
+
+void set_win_size(int client_socket, int term_fd, struct client_request* req)
+{
+    struct winsize wins;
+    if (recv(client_socket, &wins, req->data_size, 0) < 0) {
+        info_msg("could not retrive winsize struct");
+        return;
+    }
+
+    if (ioctl(term_fd, TIOCSWINSZ, &wins) < 0)
+        err_sys("ioctl");
+
+    info_msg("terminal window size is changed");
+}
+

@@ -9,6 +9,7 @@
 
 #include "networking.h"
 #include "server_pty.h"
+#include "action_array.h"
 
 static char* shell_argv[] = {
     "/bin/bash",
@@ -46,7 +47,6 @@ void handle_client(int client_socket)
 
 
 static int  recv_wrapper(int, void*, size_t);
-static void set_win_size(int client_socket, size_t size, int fd);
 
 static void main_client_req_loop(int client_socket, int master_fd, int pid)
 {
@@ -61,22 +61,13 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
         if (req.type) 
         {
             req.data_size = ntohl(req.data_size);
+            req.type = ntohl(req.type);
 
-            switch (ntohl(req.type)) {
-            case TYPE_WINSIZE:
-                set_win_size(client_socket, req.data_size, master_fd);
-                break;
-
-            case TYPE_DRIVERS:
-                break;
-
-            case TYPE_FILES:
-                break;
-
-            default: 
+            if (req.type > 0 || req.type < TYPE_COUNT)
+                action_array[req.type](client_socket, master_fd, &req);
+            else 
                 err_cont(0, "detecting not defined reqeust type! "
-                         "\"Are you certain whatever you're doing is worth it?\"");
-            }
+                             "\"Are you certain whatever you're doing is worth it?\"");
         }
         else {
             char buf[128] = {0};
@@ -161,18 +152,4 @@ static int recv_wrapper(int socket, void* buf, size_t size)
     } 
 
     return ret;
-}
-
-static void set_win_size(int client_socket, size_t size, int fd)
-{
-    struct winsize wins;
-    if (recv_wrapper(client_socket, &wins, size) < 0) {
-        info_msg("could not retrive winsize struct");
-        return;
-    }
-
-    if (ioctl(fd, TIOCSWINSZ, &wins) < 0)
-        err_sys("ioctl");
-
-    info_msg("terminal window size is changed");
 }
