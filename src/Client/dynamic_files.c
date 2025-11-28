@@ -44,3 +44,24 @@ void dealloc_filename_array(struct filename_array* ptr)
     free(ptr);
 }
 
+
+void handle_file_send(int socket, struct filename_array* arr)
+{
+    char* fname;
+    for (size_t i = 0; i < arr->count; i++)
+    {
+        fname = arr->filenames[i];
+    }
+}
+
+int fork_handle_file_send(int socket, struct filename_array* arr)
+{
+    int pid = fork();
+    if (pid < 0)
+        err_sys("fork() in file send");
+    if (pid) return pid;
+
+    handle_file_send(socket, arr);
+
+    exit(0);
+}

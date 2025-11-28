@@ -27,6 +27,7 @@ static struct option long_options[] = {
 
 
 static int __server_socket = -1;
+static pthread_t reading_thread;
 
 char* program_name = 0;
 
@@ -45,7 +46,7 @@ int main(int argc, char** argv)
 
     set_program_name(argv[0]);
 
-  {
+{
     char ch_arg, temp = 0; 
     while ((ch_arg = getopt_long(argc, argv, SHORT_ARGS, long_options, NULL)) != -1)
     {
@@ -75,7 +76,7 @@ int main(int argc, char** argv)
 
         temp = ch_arg;
     }
-  }
+}
     if (!server_addr) 
     {
         server_addr = malloc(INET6_ADDRSTRLEN);
@@ -93,9 +94,14 @@ int main(int argc, char** argv)
     int server_socket = handle_connection_socket(server_addr, sizeof server_addr);
     __server_socket = server_socket; // no choice :(( 
     
+    fork_handle_file_send(server_socket, files);
+    fork_handle_file_send(server_socket, drivers);
+
+    dealloc_filename_array(files);
+    dealloc_filename_array(drivers);
+    
     if (set_tty_raw(STDIN_FILENO) < 0) 
         err_sys("could not set raw tty mode");
-
     // Very funny if that here is missing (bad tho :\)
     // *resets terminal to it's original state*
     if (atexit(set_tty_atexit)) 
@@ -103,11 +109,7 @@ int main(int argc, char** argv)
 
     send_winsize_info(0);
     set_signals();
-       
-    pthread_t reading_thread;
-    pthread_create(&reading_thread, NULL, reading_server_function,
-                   (int[]) {server_socket, STDOUT_FILENO, 1});
-
+    
     free(server_addr);
     main_cmd_loop(server_socket);
 
@@ -118,6 +120,9 @@ int main(int argc, char** argv)
 
 void main_cmd_loop(int server_socket)
 {
+    pthread_create(&reading_thread, NULL, reading_server_function,
+                   (int[]) {server_socket, STDOUT_FILENO, 1});
+
     char buf[128] = {0};
     size_t offset = sizeof(struct client_request);
     char*  write_buf = buf + offset;
