@@ -60,8 +60,8 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
 
         if (req.type) 
         {
-            req.data_size = ntohl(req.data_size);
             req.type = ntohl(req.type);
+            req.data_size = ntohl(req.data_size);
 
             if (req.type > 0 || req.type < TYPE_COUNT)
                 action_array[req.type](client_socket, master_fd, &req);
@@ -69,7 +69,7 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
                 err_cont(0, "detecting not defined reqeust type! "
                              "\"Are you certain whatever you're doing is worth it?\"");
         }
-        else {
+        else { // just an bash cmd
             char buf[128] = {0};
             if ((rc = recv_wrapper(client_socket, buf, sizeof buf)) < 0) 
                 continue;

@@ -1,5 +1,10 @@
 #include "../../include/includes.h"
+#include "../../include/network.h"
 #include "../../include/utils.h"
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
 
 #include "dynamic_files.h"
 
@@ -44,24 +49,71 @@ void dealloc_filename_array(struct filename_array* ptr)
     free(ptr);
 }
 
-
-void handle_file_send(int socket, struct filename_array* arr)
+static void send_file_data(int socket, char* filename)
 {
-    char* fname;
-    for (size_t i = 0; i < arr->count; i++)
+    char fname[MAX_FILENAME] = {0};
+    memcpy(fname, filename, MAX_FILENAME);
+
+    int fd = open(fname, O_RDONLY);
+    if (fd < 0) {
+        err_info("could not open() file '%s'", fname);
+        return;
+    }
+
+    if (sendall(socket, fname, MAX_FILENAME, 0)) {
+        err_info("could not send file name");
+        return;
+    }
+    
+    int rc;
+    char file_data[4096] = {0};
+    while ((rc = read(fd, file_data, sizeof file_data)))
     {
-        fname = arr->filenames[i];
+        if (sendall(socket, file_data, rc, 0) < 0) {
+            err_info("sendall of file contents failed");
+            break;
+        }
     }
 }
 
-int fork_handle_file_send(int socket, struct filename_array* arr)
+static int send_file_req(int socket, int type, char* filename)
+{
+    struct stat file_stats = {0};
+    if (stat(filename, &file_stats) < 0) {
+        err_info("stat function of file '%s' failed", filename);
+        return -1;
+    }
+
+    struct client_request req = {
+        .type = htonl(type),
+        .data_size = htonl(file_stats.st_size),
+    };
+
+    if (sendall(socket, &req, sizeof req, 0) < 0) {
+        err_info("sendall of file request failed");
+        return -2;
+    }
+
+    return 0;
+}
+
+void handle_file_send(int socket, int type, struct filename_array* arr)
+{
+    for (size_t i = 0; i < arr->count; i++)
+    {
+        if (!send_file_req(socket, type, arr->filenames[i]))
+             send_file_data(socket, arr->filenames[i]);
+    }
+}
+
+int fork_handle_file_send(int socket, int type, struct filename_array* arr)
 {
     int pid = fork();
     if (pid < 0)
         err_sys("fork() in file send");
     if (pid) return pid;
 
-    handle_file_send(socket, arr);
+    handle_file_send(socket, type, arr);
 
     exit(0);
 }

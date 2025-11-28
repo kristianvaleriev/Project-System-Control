@@ -94,8 +94,8 @@ int main(int argc, char** argv)
     int server_socket = handle_connection_socket(server_addr, sizeof server_addr);
     __server_socket = server_socket; // no choice :(( 
     
-    fork_handle_file_send(server_socket, files);
-    fork_handle_file_send(server_socket, drivers);
+    fork_handle_file_send(server_socket, TYPE_FILES, files);
+    fork_handle_file_send(server_socket, TYPE_DRIVERS, drivers);
 
     dealloc_filename_array(files);
     dealloc_filename_array(drivers);
