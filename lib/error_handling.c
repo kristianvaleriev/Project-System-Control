@@ -40,7 +40,7 @@ static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
         snprintf(buf+len, MAXLINE-len-1, ": %s",
                  strerror(error));
 
-    strcat(buf, "\n");
+    strcat(buf, "\n\r");
 
     if (!is_daemon) {
         fflush(stdout); /* in case stdout and stderr are the same */

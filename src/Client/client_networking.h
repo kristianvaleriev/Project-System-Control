@@ -9,5 +9,6 @@
 
 int   get_connected_socket(void* addr, size_t);
 int   validate_ip_address(char* ptr);
+int   new_connected_server_socket(void);
 
 #endif

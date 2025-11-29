@@ -18,6 +18,8 @@
 
 #include "client_networking.h"
 
+static struct addrinfo saved_addr;
+
 int get_connected_socket(void* addr, size_t size)
 {
     struct addrinfo *result, *temp_ai;
@@ -39,8 +41,14 @@ int get_connected_socket(void* addr, size_t size)
         socket_ret = socket(temp_ai->ai_family, SOCK_STREAM, temp_ai->ai_protocol);
         if (socket_ret >= 0) 
         {
-            if (!connect(socket_ret, temp_ai->ai_addr, temp_ai->ai_addrlen))
+            if (!connect(socket_ret, temp_ai->ai_addr, temp_ai->ai_addrlen)) {
+                saved_addr = *temp_ai;
+
+                saved_addr.ai_addr  = malloc(sizeof *saved_addr.ai_addr);
+                *saved_addr.ai_addr = *temp_ai->ai_addr;
+
                 break;
+            }
             else socket_ret = ERR_CONNECT;
         }
         else socket_ret = ERR_SOCKET;
@@ -48,6 +56,18 @@ int get_connected_socket(void* addr, size_t size)
     freeaddrinfo(result);
 
     return socket_ret;
+}
+
+int new_connected_server_socket(void)
+{
+    int ret = socket(saved_addr.ai_family, SOCK_STREAM, saved_addr.ai_protocol);
+    if (ret < 0)
+        return ERR_SOCKET;
+
+    if (connect(ret, saved_addr.ai_addr, saved_addr.ai_addrlen))
+        return ERR_CONNECT;
+
+    return ret;
 }
 
 int validate_ip_address(char *ptr)

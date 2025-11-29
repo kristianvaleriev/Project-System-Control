@@ -35,18 +35,29 @@ int set_tty_raw(int fd)
     }
     users_term = term;
 
-    // Echo off, canonical mode off, extended proc off,
-    // signal chars off.
-    term.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
 
+   	term.c_iflag |= IGNPAR;
     // No SIGINT on BREAK, CR-to-NL map off, input parity off,
     // dont strip 8th bit on input (no idea why, really),
     // output flow control off. 
-    term.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    //term.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    term.c_iflag &= ~(ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXANY | IXOFF);
+
+#ifdef IUCLC
+    term.c_iflag &= ~IUCLC;
+#endif
+    
+    // Echo off, canonical mode off, extended proc off,
+    // signal chars off.
+    //term.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    term.c_lflag &= ~(ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHONL);
+#ifdef IEXTEN
+    term.c_lflag &= ~IEXTEN;
+#endif
 
     // Clear size bits and parity checking 
-    term.c_cflag &= ~(CSIZE | PARENB);  
-    term.c_cflag |= CS8;
+    //term.c_cflag &= ~(CSIZE | PARENB);  
+    //term.c_cflag |= CS8;
 
     // Output processing off.
     term.c_oflag &= ~(OPOST);
@@ -59,6 +70,7 @@ int set_tty_raw(int fd)
 
     // Verify our changes, because tcsetattr can return success on partial 
     // changes, because of course it can
+    /*
     tcgetattr(fd, &term);
     if ((term.c_lflag & (ECHO | ICANON | IEXTEN | ISIG)) ||
         (term.c_iflag & (BRKINT | ICRNL | INPCK | ISTRIP | IXON)) ||
@@ -71,6 +83,7 @@ int set_tty_raw(int fd)
         errno = EINVAL;
         return -1;
     }
+    */
 
     is_raw = 1;
     saved_fd = fd;

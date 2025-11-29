@@ -5,7 +5,7 @@
 #include "../../include/network.h"
 
 #include "server_pty.h"
-#include "handle_files.h"
+#include "file_handling.h"
 
 typedef void (*action_function)(int socket, int term_fd,
                                 struct client_request*);

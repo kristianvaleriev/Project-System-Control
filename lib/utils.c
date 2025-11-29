@@ -25,7 +25,7 @@ void* reading_function(void* fds)
     int* write_fd = (int*) (fds + sizeof(int));
 
     ssize_t size;
-    char buf[4098];
+    char buf[2049];
     while (1)
     {
         if ((size = read(*read_fd, buf, sizeof buf)) < 0) {

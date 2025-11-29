@@ -49,6 +49,6 @@ void set_win_size(int client_socket, int term_fd, struct client_request* req)
     if (ioctl(term_fd, TIOCSWINSZ, &wins) < 0)
         err_sys("ioctl");
 
-    info_msg("terminal window size is changed");
+    info_msg("terminal window's size set");
 }
 

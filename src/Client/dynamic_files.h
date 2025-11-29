@@ -13,7 +13,7 @@ struct filename_array* init_filename_array(void);
 void    dealloc_filename_array(struct filename_array* ptr);
 void    insert_in_array(struct filename_array* arr, char* filename, size_t size);
 
-int     fork_handle_file_send(int socket, int type, struct filename_array*);
 void    handle_file_send(int socket, int type, struct filename_array* arr);
+int     fork_handle_file_send(int type, struct filename_array*);
 
 #endif

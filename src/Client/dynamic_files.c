@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 
 #include "dynamic_files.h"
+#include "client_networking.h"
 
 #define MAX 5
 
@@ -67,7 +68,7 @@ static void send_file_data(int socket, char* filename)
     
     int rc;
     char file_data[4096] = {0};
-    while ((rc = read(fd, file_data, sizeof file_data)))
+    while ((rc = read(fd, file_data, sizeof file_data)) > 0)
     {
         if (sendall(socket, file_data, rc, 0) < 0) {
             err_info("sendall of file contents failed");
@@ -106,12 +107,19 @@ void handle_file_send(int socket, int type, struct filename_array* arr)
     }
 }
 
-int fork_handle_file_send(int socket, int type, struct filename_array* arr)
+int fork_handle_file_send(int type, struct filename_array* arr)
 {
+    if (!arr->count)
+        return 0;
+
     int pid = fork();
-    if (pid < 0)
-        err_sys("fork() in file send");
+    if (pid < 0) {
+        err_info("fork() in file send");
+        return -2;
+    }
     if (pid) return pid;
+
+    int socket = new_connected_server_socket();
 
     handle_file_send(socket, type, arr);
 

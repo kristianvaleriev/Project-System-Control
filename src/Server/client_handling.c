@@ -63,13 +63,17 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
             req.type = ntohl(req.type);
             req.data_size = ntohl(req.data_size);
 
-            if (req.type > 0 || req.type < TYPE_COUNT)
+            if (req.type > 0 || req.type < TYPE_COUNT) {
                 action_array[req.type](client_socket, master_fd, &req);
-            else 
+            }
+            else {
                 err_cont(0, "detecting not defined reqeust type! "
-                             "\"Are you certain whatever you're doing is worth it?\"");
+                         "\"Are you certain whatever you're doing is worth it?\"");
+            }
+
+            memset(&req, 0, sizeof req);
         }
-        else { // just an bash cmd
+        else { // just a bash cmd
             char buf[128] = {0};
             if ((rc = recv_wrapper(client_socket, buf, sizeof buf)) < 0) 
                 continue;
@@ -86,6 +90,7 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
 static int handle_child_exec(int* fd)
 {
     int master_pty, slave_pty;
+
     char* slave_name = malloc(128);
     if (openpty(&master_pty, &slave_pty, slave_name, NULL, NULL)) 
         err_sys("openpty failed");
@@ -147,7 +152,6 @@ static int recv_wrapper(int socket, void* buf, size_t size)
         err_info("recv failed");
     }
     else if (ret == 0) {
-        info_msg("client has closed the connection");
         exit_handler(0);
     } 
 

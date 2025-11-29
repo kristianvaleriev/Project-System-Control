@@ -188,11 +188,11 @@ void* reading_server_function(void* fds)
     int* write_fd      = (int*) (fds + sizeof(int));
 
     ssize_t size;
-    char buf[2049];
+    char buf[4098];
     while (1)
     {
         if ((size = recv(*server_socket, buf, sizeof buf, 0)) < 0) {
-            err_info("reading function's recv fail");
+            err_info("reading function's read fail");
             continue;;
         }
         else if (!size) {
