@@ -41,7 +41,7 @@ int set_tty_raw(int fd)
     // dont strip 8th bit on input (no idea why, really),
     // output flow control off. 
     //term.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    term.c_iflag &= ~(ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXANY | IXOFF);
+    term.c_iflag &= ~(BRKINT | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXANY | IXOFF);
 
 #ifdef IUCLC
     term.c_iflag &= ~IUCLC;

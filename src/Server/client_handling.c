@@ -53,10 +53,13 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
     int rc;
     struct client_request req = {0};
 
+    char cmd_buf[128] = {0};
     while (1)
     {
-        if ((rc = recv_wrapper(client_socket, &req, sizeof req)) < 0) 
+        if ((rc = recv(client_socket, &req, sizeof req, 0)) < 0) 
             continue;
+        if (!rc)
+            exit_handler(0);
 
         if (req.type) 
         {
@@ -74,11 +77,13 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
             memset(&req, 0, sizeof req);
         }
         else { // just a bash cmd
-            char buf[128] = {0};
-            if ((rc = recv_wrapper(client_socket, buf, sizeof buf)) < 0) 
+            if ((rc = recv(client_socket, cmd_buf, sizeof cmd_buf, 0)) < 0) 
                 continue;
+            if(!rc)
+                exit_handler(0);
 
-            write(master_fd, buf, rc);
+            write(master_fd, cmd_buf, rc);
+            //memset(cmd_buf, 0, sizeof cmd_buf);
         }
         
         // Was wondering why the server takes so long to respond 

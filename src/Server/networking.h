@@ -3,6 +3,8 @@
 
 int   get_listening_socket(struct addrinfo* binded_ai);
 char* get_host_addr(struct sockaddr*);
+
+void  set_wait_time(int time);
 void* multicast_beacon(void*);
 
 #endif

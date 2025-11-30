@@ -20,8 +20,8 @@
 #define SHORT_ARGS "-a:f:d:"
 static struct option long_options[] = {
     { "address",  required_argument, NULL, 'a'},
-    { "files",    required_argument, NULL, 'f'},
     { "drivers",  required_argument, NULL, 'd'},
+    { "files",    required_argument, NULL, 'f'},
     {},
 };
 
@@ -58,7 +58,7 @@ int main(int argc, char** argv)
                 err_quit_msg("given an invalid ip address");
         break;
 
-        case 'f': insert_in_array(files,optarg, strlen(optarg));
+        case 'f': insert_in_array(files, optarg, strlen(optarg));
         break;
 
         case 'd': insert_in_array(drivers, optarg, strlen(optarg));
@@ -132,8 +132,10 @@ void main_cmd_loop(int server_socket)
     while (1) 
     {
         rc = read(STDIN_FILENO, write_buf, sizeof_buf);
-        if (rc < 0)
+        if (rc < 0) {
             err_info("read failed");
+            break;
+        }
 
         if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) < 0)
             break;

@@ -3,6 +3,7 @@
 #include "../../include/utils.h"
 
 #include <asm-generic/socket.h>
+#include <bits/pthreadtypes.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -14,6 +15,7 @@
 #include <ifaddrs.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <pthread.h>
 
 int get_listening_socket(struct addrinfo* binded_ai)
 {
@@ -110,10 +112,35 @@ char* get_host_addr(struct sockaddr* addr)
     return ret_addr;
 }
 
+pthread_mutex_t wait_time_lock = PTHREAD_MUTEX_INITIALIZER;
+int wait_time = 2;
+
+void set_wait_time(int time)
+{
+    pthread_mutex_lock(&wait_time_lock);
+    wait_time = time;
+    pthread_mutex_unlock(&wait_time_lock);
+}
+
+int get_wait_time(void)
+{
+    int ret;
+
+    pthread_mutex_lock(&wait_time_lock);
+    ret = wait_time;
+    pthread_mutex_unlock(&wait_time_lock);
+
+    return ret;
+}
+
 void* multicast_beacon(void* _)
 {
     struct sockaddr server_addr;
     char* p_addr = get_host_addr(&server_addr);
+    if (!p_addr) {
+        info_msg("could not get host ip address of a listening network interface");
+        return (void*) 1;
+    }
 
     // Here is hoping nobody notices this race cond.
     // (probably fine if using syslog)
@@ -126,7 +153,7 @@ void* multicast_beacon(void* _)
       #else
         multicast_send(p_addr, strlen(p_addr));
       #endif
-        sleep(2);
+        sleep(get_wait_time());
     }
 
     // Probably wont happened but still...
