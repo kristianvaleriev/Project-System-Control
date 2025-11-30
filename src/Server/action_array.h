@@ -12,6 +12,7 @@ typedef void (*action_function)(int socket, int term_fd,
 
 static action_function action_array[] = {
     [TYPE_WINSIZE] = set_win_size,
+    [TYPE_DRIVERS] = handle_drivers,
     [TYPE_FILES]   = handle_files,
 };
 

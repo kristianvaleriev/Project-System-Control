@@ -18,8 +18,10 @@
 #include "client_handling.h"
 #include "daemoned.h"
 
+#define ROOT_STORAGE "/var/lib/"
 
 char* program_name = 0;
+char* program_storage = 0;
 
 void    set_signals(void);
 void    sigchld_handler(int);
@@ -30,6 +32,12 @@ int main(int argc, char** argv)
     struct addrinfo server_ip;
 
     set_program_name(argv[0]);
+
+    if (geteuid() != 0) {
+        info_msg("not running as root! Not all features will be avalaible");
+        set_program_storage(getenv("HOME"));
+    }
+    else set_program_storage(ROOT_STORAGE);
 
     // strcmp ALSO DOESN'T check for NULL......
     // (makes sence; what would return if NULL after all, but still.)
@@ -79,10 +87,14 @@ int main(int argc, char** argv)
     }
 }
 
+static int user_counter = 0;
+
 void fork_for_client(int listening_socket, int client_socket)
 {
-    static int user_counter = 0;
     user_counter++;
+
+    if (user_counter == 1)
+        set_wait_time(10);
 
     pid_t pid = fork();
     if (pid) {
@@ -128,6 +140,11 @@ void sigchld_handler(int _)
     int errnum = errno; // might be overwritten by waitpid
     while (waitpid(-1, NULL, WNOHANG) > 0);
     errno = errnum;
+
+    if (user_counter) {
+        if (!(--user_counter))
+            set_wait_time(2);
+    }
 }
 
 // Handle signals of interest

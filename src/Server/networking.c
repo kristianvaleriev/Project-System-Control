@@ -120,6 +120,8 @@ void set_wait_time(int time)
     pthread_mutex_lock(&wait_time_lock);
     wait_time = time;
     pthread_mutex_unlock(&wait_time_lock);
+
+    info_msg("multicast wait time is set to %d secs", time);
 }
 
 int get_wait_time(void)
