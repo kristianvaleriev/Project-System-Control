@@ -99,41 +99,64 @@ static ssize_t recv_filename(int socket, char* filename, size_t size)
 void handle_files(int socket, int term_fd, struct client_request* req)
 {
     char filename[MAX_FILENAME] = {0};
-    if (recv_filename(socket, filename, req->data_size) <= 0) 
+    if (recv_filename(socket, filename, MAX_FILENAME) <= 0) 
         return;
 
     create_file(socket, filename, req->data_size);
 }
 
+
+static void set_working_dir(char* filename);
+static void restore_working_dir(void);
+
 void handle_drivers(int socket, int term_fd, struct client_request* req)
 {
     char filename[MAX_FILENAME] = {0};
-    if (recv_filename(socket, filename, req->data_size) <= 0)
+    if (recv_filename(socket, filename, MAX_FILENAME) <= 0)
         return;
 
     char* ptr = strrchr(filename, '/');
     if (ptr) {
         size_t len = strlen(++ptr);
         memmove(filename, ptr, len);
-        filename[len] = '\0';
+        memset(filename + len, 0, MAX_FILENAME - len);
     }
 
-    char path_buf[MAX_FILENAME + sizeof DRIVER_DIR] = {0};
-    snprintf(path_buf, sizeof path_buf, "%s%s", DRIVER_DIR, filename);
+    set_working_dir(filename);
 
-    if (create_file(socket, path_buf, req->data_size) < 0) {
+    if (create_file(socket, filename, req->data_size) < 0) {
         info_msg("driver creation failed");
         return;
     }
+
+    restore_working_dir();
 }
 
 extern char* program_storage;
+static char* saved_cwd;
+
+#define MAX_PATH_ALLOC 256
 
 static void set_working_dir(char* filename)
 {
-    assert(filename != NULL);
+    saved_cwd = calloc(MAX_PATH_ALLOC, 1);
+    if (!getcwd(saved_cwd, MAX_PATH_ALLOC)) 
+        err_sys("getcwd");
 
-    size_t size = strlen(program_storage) + MAX_FILENAME + 1;
-    char* new_cwd = calloc(size, 1);
-    snprintf(new_cwd, size, "%s/%s.d", program_storage, filename);
+    char* new_wd = make_directory(program_storage, filename, "-mod.d");
+    if (chdir(new_wd) < 0) 
+        err_sys("chdir on set");
+
+    free(new_wd);
+}
+
+static void restore_working_dir(void)
+{
+    if (saved_cwd) 
+        return;
+
+    if (chdir(saved_cwd) < 0)
+        err_sys("chdir on restore");
+
+    free(saved_cwd);
 }

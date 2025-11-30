@@ -25,13 +25,14 @@ static struct option long_options[] = {
     {},
 };
 
-
 static int __server_socket = -1;
 static pthread_t reading_thread;
 
 char* program_name = 0;
+char* program_storage = (char*) -1;
 
 
+void    save_to_file(char*, void*, size_t);
 int     handle_connection_socket(char* server_addr, size_t addr_size);
 void*   reading_server_function(void*);
 void    send_winsize_info(int);
@@ -89,6 +90,7 @@ int main(int argc, char** argv)
             err_sys("multicast receiver failed (err num: %d)", multicast_status);
 
         info_msg("got server ip: %s", server_addr);
+        save_to_file("recieved_server_ip", server_addr, strlen(server_addr));
     }
 
     int server_socket = handle_connection_socket(server_addr, sizeof server_addr);
@@ -222,4 +224,20 @@ void set_signals(void)
 
     if (sigaction(SIGWINCH, &sa, NULL) < 0)
         err_sys("sigaction failed");
+}
+
+void save_to_file(char* filename, void* content, size_t size)
+{
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0744);
+    if (fd < 0) {
+        err_info("open() failed when saving to file");
+        return;
+    }
+
+    if (write(fd, content, size) < 0) {
+        err_sys("write() failed when saving to file");
+        return;
+    }
+
+    close(fd);
 }

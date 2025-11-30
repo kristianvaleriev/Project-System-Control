@@ -33,14 +33,14 @@ void set_program_storage(const char* prefix)
     if (!program_storage)
         err_sys("could not create storage directory");
 
-    info_msg("programe storage '%s' created", program_storage);
+    info_msg("using program storage '%s'", program_storage);
 }
 
 char* make_directory(const char* prefix, const char* name, const char* suffix)
 {
     assert(prefix != NULL && name != NULL && suffix != NULL);
 
-    size_t size = strlen(prefix) + strlen(name) + strlen(suffix) + 1;
+    size_t size = strlen(prefix) + strlen(name) + strlen(suffix) + 2;
     char* ret = calloc(size, 1);
     if (!ret)
         return NULL;
