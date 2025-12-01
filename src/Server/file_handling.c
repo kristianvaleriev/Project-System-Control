@@ -166,26 +166,32 @@ static void restore_working_dir(void)
     free(saved_cwd);
 }
 
-static char* get_uname_release(void)
+#define KERNEL_BUILD "/usr/lib/modules/%s/build"
+
+static char* get_kernel_build_dir(void)
 {
     struct utsname uname_info;
     if (uname(&uname_info) < 0) {
         err_info("could not get OS name and version");
         return NULL;
     }
-    return strdup(uname_info.release);
+
+    size_t size = strlen(uname_info.release) + sizeof KERNEL_BUILD;
+    char* ret = calloc(size, 1);
+    snprintf(ret, size, KERNEL_BUILD, uname_info.release);
+
+    return ret;
 }
 
 static int compile_driver(char* driver_name)
 {
-    static char* release_v;
-
-    if (!release_v) {
-        if (!(release_v = get_uname_release()))
+    static char* kernel_dir;
+    if (!kernel_dir) {
+        if (!(kernel_dir = get_kernel_build_dir()))
             return -1;
     }
 
-    info_msg("uname: %s", release_v);
+    info_msg("kernel dir: %s", kernel_dir);
 
     return 0;
 }
