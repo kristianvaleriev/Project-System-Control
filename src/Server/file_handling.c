@@ -5,10 +5,9 @@
 #include <sys/utsname.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <unistd.h>
 
 #define ACCESS_MODE   0744
-#define DRIVER_DIR    "Drivers.d/"
-
 
 static void flush_recv_out(int socket, size_t size)
 {
@@ -107,9 +106,9 @@ void handle_files(int socket, int term_fd, struct client_request* req)
 }
 
 
-static void set_working_dir(char* filename);
-static void restore_working_dir(void);
-static int  compile_driver(char* driver_name);
+static char*  set_working_dir(char* filename);
+static void   restore_working_dir(void);
+static pid_t  compile_driver(char* driver_name, char* cwd);
 
 void handle_drivers(int socket, int term_fd, struct client_request* req)
 {
@@ -124,15 +123,17 @@ void handle_drivers(int socket, int term_fd, struct client_request* req)
         memset(filename + len, 0, MAX_FILENAME - len);
     }
 
-    set_working_dir(filename);
+    char* cwd = set_working_dir(filename);
 
     if (create_file(socket, filename, req->data_size) < 0) {
         info_msg("driver creation failed");
         return;
     }
 
-    if (!compile_driver(filename)) 
-        //install the driver
+    pid_t pid = compile_driver(filename, cwd);
+    //waitpid
+
+    free(cwd);
 
     restore_working_dir();
 }
@@ -142,7 +143,7 @@ static char* saved_cwd;
 
 #define MAX_PATH_ALLOC 256
 
-static void set_working_dir(char* filename)
+static char* set_working_dir(char* filename)
 {
     saved_cwd = calloc(MAX_PATH_ALLOC, 1);
     if (!getcwd(saved_cwd, MAX_PATH_ALLOC)) 
@@ -152,7 +153,7 @@ static void set_working_dir(char* filename)
     if (chdir(new_wd) < 0) 
         err_sys("chdir on set");
 
-    free(new_wd);
+    return new_wd;
 }
 
 static void restore_working_dir(void)
@@ -166,32 +167,84 @@ static void restore_working_dir(void)
     free(saved_cwd);
 }
 
-#define KERNEL_BUILD "/usr/lib/modules/%s/build"
+
+static void create_makefile(char* filename, size_t len)
+{
+
+#define OBJM "obj-m += "
+
+    int fd = open("Makefile", O_WRONLY | O_CREAT | O_TRUNC, ACCESS_MODE);
+    if (fd < 0)
+        err_sys("could not create Makefile");
+
+    filename[len - 1] = 'o';
+
+    char buf[MAX_FILENAME + sizeof OBJM] = OBJM;
+    strcat(buf, filename);
+
+    if (write(fd, buf, strlen(buf)) < 0)
+        err_sys("write to Makefile failed");
+
+    filename[len - 1] = 'c';
+}
+
+
+#define KERNEL_MAKE "/usr/lib/modules/%s/build/Makefile"
 
 static char* get_kernel_build_dir(void)
 {
+    static char* ret;
+    if (ret)
+        return ret;
+
     struct utsname uname_info;
     if (uname(&uname_info) < 0) {
         err_info("could not get OS name and version");
         return NULL;
     }
 
-    size_t size = strlen(uname_info.release) + sizeof KERNEL_BUILD;
-    char* ret = calloc(size, 1);
-    snprintf(ret, size, KERNEL_BUILD, uname_info.release);
+    size_t size = strlen(uname_info.release) + sizeof KERNEL_MAKE;
+    ret = calloc(size, 1);
+    snprintf(ret, size, KERNEL_MAKE, uname_info.release);
 
     return ret;
 }
 
-static int compile_driver(char* driver_name)
+static pid_t compile_driver(char* driver_name, char* cwd)
 {
-    static char* kernel_dir;
-    if (!kernel_dir) {
-        if (!(kernel_dir = get_kernel_build_dir()))
-            return -1;
-    }
+    char* kernel_dir = get_kernel_build_dir();
+    if (!kernel_dir)
+        err_sys("could not get kernel build directory");
 
-    info_msg("kernel dir: %s", kernel_dir);
 
-    return 0;
+    int pid = fork();
+    if (pid < 0)
+        err_sys("fork() in compile driver");
+    if (pid)
+        return pid;
+
+
+    create_makefile(driver_name, strlen(driver_name));
+   
+    char arg_M[128] = "M=";
+    if (!strcat(arg_M, cwd))
+        err_sys("strcat failed");
+
+    char* make_argv[] = {
+        "/usr/bin/make",
+        "-f", kernel_dir,
+        arg_M,
+        NULL
+    };
+
+    int fd = open("compile.log", O_WRONLY | O_CREAT | O_TRUNC, ACCESS_MODE);
+
+    close(STDIN_FILENO);
+    dup2(fd, STDOUT_FILENO);
+    dup2(fd, STDERR_FILENO);
+
+    execv(make_argv[0], &make_argv[0]);
+    info_msg("make failed");
+
+    exit(-2);
 }

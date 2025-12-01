@@ -90,7 +90,7 @@ int main(int argc, char** argv)
             err_sys("multicast receiver failed (err num: %d)", multicast_status);
 
         info_msg("got server ip: %s", server_addr);
-        save_to_file("recieved_server_ip", server_addr, strlen(server_addr));
+        save_to_file("received_server_ip", server_addr, strlen(server_addr));
     }
 
     int server_socket = handle_connection_socket(server_addr, sizeof server_addr);
@@ -184,7 +184,7 @@ int handle_connection_socket(char* server_addr, size_t addr_size)
     return server_socket;
 }
 
-// Tried to used the util threaded function, but it is too
+// Tried to use the util threaded function, but it is too
 // different and it would be a mess.
 void* reading_server_function(void* fds)
 {
