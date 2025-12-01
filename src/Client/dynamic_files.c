@@ -104,6 +104,7 @@ void handle_file_send(int socket, int type, struct filename_array* arr)
     {
         if (!send_file_req(socket, type, arr->filenames[i]))
              send_file_data(socket, arr->filenames[i]);
+        info_msg("file: %s", arr->filenames[i]);
     }
 }
 

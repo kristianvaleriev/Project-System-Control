@@ -2,6 +2,7 @@
 #include "../../include/network.h"
 #include "../../include/utils.h"
 
+#include <sys/utsname.h>
 #include <sys/stat.h>
 #include <assert.h>
 
@@ -108,6 +109,7 @@ void handle_files(int socket, int term_fd, struct client_request* req)
 
 static void set_working_dir(char* filename);
 static void restore_working_dir(void);
+static int  compile_driver(char* driver_name);
 
 void handle_drivers(int socket, int term_fd, struct client_request* req)
 {
@@ -128,6 +130,9 @@ void handle_drivers(int socket, int term_fd, struct client_request* req)
         info_msg("driver creation failed");
         return;
     }
+
+    if (!compile_driver(filename)) 
+        //install the driver
 
     restore_working_dir();
 }
@@ -159,4 +164,28 @@ static void restore_working_dir(void)
         err_sys("chdir on restore");
 
     free(saved_cwd);
+}
+
+static char* get_uname_release(void)
+{
+    struct utsname uname_info;
+    if (uname(&uname_info) < 0) {
+        err_info("could not get OS name and version");
+        return NULL;
+    }
+    return strdup(uname_info.release);
+}
+
+static int compile_driver(char* driver_name)
+{
+    static char* release_v;
+
+    if (!release_v) {
+        if (!(release_v = get_uname_release()))
+            return -1;
+    }
+
+    info_msg("uname: %s", release_v);
+
+    return 0;
 }
