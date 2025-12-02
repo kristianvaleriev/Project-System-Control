@@ -136,8 +136,10 @@ void handle_drivers(int socket, int term_fd, struct client_request* req)
     }
 
     pid_t pid = compile_driver(filename, cwd);
-    if (waitpid(pid, NULL, 0) < 0)
-        err_sys("waitpid failed");
+    //if (waitpid(pid, NULL, 0) < 0)
+    //    err_sys("waitpid failed");
+
+    info_msg("driver successfully compiled");
 
     install_driver(filename, len);
 
@@ -266,8 +268,8 @@ static void install_driver(char* driver_name, size_t len)
     char* copy = calloc(copy_len, 1);
     memmove(copy, driver_name, len);
 
-    copy[len-2] = 'k';
-    copy[len-1] = 'o';
+    copy[len-1] = 'k';
+    copy[len]   = 'o';
     info_msg("copy: %s", copy);
 
     free(copy);

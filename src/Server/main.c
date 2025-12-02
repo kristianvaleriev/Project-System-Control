@@ -24,7 +24,7 @@ char* program_name = 0;
 char* program_storage = 0;
 
 
-void    set_signals(void);
+static void    set_signals(void);
 void    sigchld_handler(int);
 void    fork_for_client(int,int);
 
@@ -149,7 +149,7 @@ void sigchld_handler(int _)
 }
 
 // Handle signals of interest
-void set_signals(void)
+static void set_signals(void)
 {
     struct sigaction sig_chld;
     sig_chld.sa_handler = sigchld_handler;
