@@ -7,6 +7,8 @@
 #include <assert.h>
 #include <unistd.h>
 
+#include <sys/wait.h>
+
 #define ACCESS_MODE   0744
 
 static void flush_recv_out(int socket, size_t size)
@@ -109,6 +111,7 @@ void handle_files(int socket, int term_fd, struct client_request* req)
 static char*  set_working_dir(char* filename);
 static void   restore_working_dir(void);
 static pid_t  compile_driver(char* driver_name, char* cwd);
+static void   install_driver(char* driver_name, size_t len);
 
 void handle_drivers(int socket, int term_fd, struct client_request* req)
 {
@@ -116,12 +119,14 @@ void handle_drivers(int socket, int term_fd, struct client_request* req)
     if (recv_filename(socket, filename, MAX_FILENAME) <= 0)
         return;
 
+    size_t len;
     char* ptr = strrchr(filename, '/');
     if (ptr) {
-        size_t len = strlen(++ptr);
+        len = strlen(++ptr);
         memmove(filename, ptr, len);
         memset(filename + len, 0, MAX_FILENAME - len);
     }
+    else len = strlen(filename);
 
     char* cwd = set_working_dir(filename);
 
@@ -131,7 +136,10 @@ void handle_drivers(int socket, int term_fd, struct client_request* req)
     }
 
     pid_t pid = compile_driver(filename, cwd);
-    //waitpid
+    if (waitpid(pid, NULL, 0) < 0)
+        err_sys("waitpid failed");
+
+    install_driver(filename, len);
 
     free(cwd);
 
@@ -242,9 +250,25 @@ static pid_t compile_driver(char* driver_name, char* cwd)
     close(STDIN_FILENO);
     dup2(fd, STDOUT_FILENO);
     dup2(fd, STDERR_FILENO);
+    if (fd != STDIN_FILENO || fd != STDOUT_FILENO ||
+        fd != STDERR_FILENO)
+        close(fd);
 
     execv(make_argv[0], &make_argv[0]);
     info_msg("make failed");
 
     exit(-2);
+}
+
+static void install_driver(char* driver_name, size_t len)
+{
+    size_t copy_len = len + 10;
+    char* copy = calloc(copy_len, 1);
+    memmove(copy, driver_name, len);
+
+    copy[len-2] = 'k';
+    copy[len-1] = 'o';
+    info_msg("copy: %s", copy);
+
+    free(copy);
 }
