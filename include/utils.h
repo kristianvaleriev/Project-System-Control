@@ -24,9 +24,8 @@ void  set_program_storage(const char* prefix);
 
 char* make_directory(const char*, const char*, const char*);
 
-void* reading_function(void* fds);
-#define create_reading_thread(thd, read_fd, write_fd)           \
-                   pthread_create(&thd, NULL, reading_function, \
+#define create_reading_thread(thd, func, read_fd, write_fd)           \
+                   pthread_create(&thd, NULL, func, \
                    (int[]) {read_fd, write_fd})
 
 #endif

@@ -110,7 +110,7 @@ void handle_files(int socket, int term_fd, struct client_request* req)
 
 static char*  set_working_dir(char* filename);
 static void   restore_working_dir(void);
-static pid_t  compile_driver(char* driver_name, char* cwd);
+static pid_t    compile_driver(char* driver_name, char* cwd);
 static void   install_driver(char* driver_name, size_t len);
 
 void handle_drivers(int socket, int term_fd, struct client_request* req)
@@ -136,10 +136,13 @@ void handle_drivers(int socket, int term_fd, struct client_request* req)
     }
 
     pid_t pid = compile_driver(filename, cwd);
-    //if (waitpid(pid, NULL, 0) < 0)
-    //    err_sys("waitpid failed");
+    
+    int status;
+    while ((status = waitpid(pid, NULL, WNOHANG)) == 0) 
+        ;
 
-    info_msg("driver successfully compiled");
+    if (status < 0)   
+        err_sys("waitpid failed");
 
     install_driver(filename, len);
 
@@ -203,7 +206,7 @@ static void create_makefile(char* filename, size_t len)
 
 static char* get_kernel_build_dir(void)
 {
-    static char* ret;
+    static char* ret = 0;
     if (ret)
         return ret;
 
@@ -226,8 +229,7 @@ static pid_t compile_driver(char* driver_name, char* cwd)
     if (!kernel_dir)
         err_sys("could not get kernel build directory");
 
-
-    int pid = fork();
+    pid_t pid = fork();
     if (pid < 0)
         err_sys("fork() in compile driver");
     if (pid)
@@ -259,18 +261,29 @@ static pid_t compile_driver(char* driver_name, char* cwd)
     execv(make_argv[0], &make_argv[0]);
     info_msg("make failed");
 
-    exit(-2);
+    _exit(-2);
 }
 
 static void install_driver(char* driver_name, size_t len)
 {
-    size_t copy_len = len + 10;
-    char* copy = calloc(copy_len, 1);
-    memmove(copy, driver_name, len);
+    size_t kobj_len = len + 10;
+    char* kobj = calloc(kobj_len, 1);
+    memmove(kobj, driver_name, len);
 
-    copy[len-1] = 'k';
-    copy[len]   = 'o';
-    info_msg("copy: %s", copy);
+    kobj[len-1] = 'k';
+    kobj[len]   = 'o';
 
-    free(copy);
+    if (!access(kobj, F_OK))
+        info_msg("%s successfully compiled", driver_name);
+    else {
+        info_msg("%s not compiled, check compile.log", driver_name);
+        return;
+    }
+
+    if (geteuid()) {
+        info_msg("not running as root. Cannot install %s", kobj);
+        return;
+    }
+
+    free(kobj);
 }

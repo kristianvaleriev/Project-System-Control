@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <sys/socket.h>
 
 extern char* program_name;
 
@@ -53,33 +54,4 @@ char* make_directory(const char* prefix, const char* name, const char* suffix)
 
     return ret;
 }
-
-void* reading_function(void* fds)
-{
-    int* read_fd  = (int*) fds; 
-    int* write_fd = (int*) (fds + sizeof(int));
-
-    ssize_t size;
-    char buf[2049];
-    while (1)
-    {
-        if ((size = read(*read_fd, buf, sizeof buf)) < 0) {
-            if (errno == EIO)
-                err_cont(0, "EIO");
-            else
-                err_info("reading function's read fail");
-            break;
-        }
-        buf[size] = '\0';
-        //info_msg("sending buf: %s", buf);
-
-        if (write(*write_fd, buf, size) < 0) {
-            err_info("reading function's write fail");
-            break;
-        }
-    }
-
-    return 0;
-}
-
 
