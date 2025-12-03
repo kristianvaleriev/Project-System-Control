@@ -207,7 +207,7 @@ static void create_makefile(char* filename, size_t len)
 }
 
 
-#define KERNEL_MAKE "/usr/lib/modules/%s/build/Makefile"
+#define KERNEL_DIR "/usr/lib/modules/%s/build/"
 
 static char* get_kernel_build_dir(void)
 {
@@ -221,9 +221,9 @@ static char* get_kernel_build_dir(void)
         return NULL;
     }
 
-    size_t size = strlen(uname_info.release) + sizeof KERNEL_MAKE;
+    size_t size = strlen(uname_info.release) + sizeof KERNEL_DIR;
     ret = calloc(size, 1);
-    snprintf(ret, size, KERNEL_MAKE, uname_info.release);
+    snprintf(ret, size, KERNEL_DIR, uname_info.release);
 
     return ret;
 }
@@ -249,7 +249,7 @@ static pid_t compile_driver(char* driver_name, char* cwd)
 
     char* make_argv[] = {
         "/usr/bin/make",
-        "-f", kernel_dir,
+        "-C", kernel_dir,
         arg_M,
         NULL
     };
