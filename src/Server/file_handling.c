@@ -2,10 +2,15 @@
 #include "../../include/network.h"
 #include "../../include/utils.h"
 
+#include <asm-generic/errno-base.h>
+#include <fcntl.h>
 #include <sys/utsname.h>
 #include <sys/stat.h>
 #include <assert.h>
-#include <unistd.h>
+#include <errno.h>
+
+#include <linux/module.h>
+#include <sys/syscall.h>
 
 #include <sys/wait.h>
 
@@ -273,17 +278,29 @@ static void install_driver(char* driver_name, size_t len)
     kobj[len-1] = 'k';
     kobj[len]   = 'o';
 
-    if (!access(kobj, F_OK))
-        info_msg("%s successfully compiled", driver_name);
-    else {
-        info_msg("%s not compiled, check compile.log", driver_name);
-        return;
+    int kobj_fd = open(kobj, O_RDONLY);
+    if (kobj_fd < 0) { 
+        if (errno == ENOENT)
+            info_msg("%s could not compile. Check compile.log", driver_name);
+        else 
+            err_info("open of %s kobj failed", kobj);
+        goto OUT;
     }
+    info_msg("%s successfully compiled", kobj);
 
     if (geteuid()) {
         info_msg("not running as root. Cannot install %s", kobj);
-        return;
+        goto OUT;
     }
 
+    if (syscall(SYS_finit_module, kobj_fd, (char*) {""}, 0
+ //               MODULE_INIT_IGNORE_MODVERSIONS |
+ //               MODULE_INIT_IGNORE_VERMAGIC
+        ) < 0)
+        err_info("syscall of init_module failed (errno: %d)", errno);
+
+    info_msg("successfully");
+
+  OUT:
     free(kobj);
 }
