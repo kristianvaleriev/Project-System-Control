@@ -294,12 +294,14 @@ static void install_driver(char* driver_name, size_t len)
     }
 
     if (syscall(SYS_finit_module, kobj_fd, (char*) {""}, 0
- //               MODULE_INIT_IGNORE_MODVERSIONS |
- //               MODULE_INIT_IGNORE_VERMAGIC
+//               MODULE_INIT_IGNORE_MODVERSIONS |
+//               MODULE_INIT_IGNORE_VERMAGIC
         ) < 0)
+    {
         err_info("syscall of init_module failed (errno: %d)", errno);
-
-    info_msg("successfully");
+    }
+    else 
+        info_msg("%s driver module successfully installed", kobj);
 
   OUT:
     free(kobj);
