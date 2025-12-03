@@ -20,6 +20,7 @@
 * the multicast functions in netlib.c
 */
 
+extern char* program_storage;
 extern char* program_name;
 
 static DIR* check_dir(char* dirname, char* path) 
@@ -36,22 +37,14 @@ static DIR* check_dir(char* dirname, char* path)
 	return ret;
 }
 
-static int open_lockdir(void)
-{
-	char path_fmt[128] = "/var/run/user/%u/";
-	char path[128] = {0};
-	snprintf(path, sizeof path, path_fmt, geteuid());
-    
-	return dirfd(check_dir(program_name, path));
-}
+#define LOCK_DIR "daemoned.lock"
 
 int lock_daemon(void)
 {
-	int lock_dir = open_lockdir();
-	if (lock_dir < 0)
-        err_sys("can't open user lock directory");
+    char lock_dir[256];
+    snprintf(lock_dir, sizeof lock_dir, "%s/" LOCK_DIR, program_storage);
 
-	int fd = openat(lock_dir, "lock.pid", O_RDWR | O_CREAT, 0644);
+	int fd = open(lock_dir, O_RDWR | O_CREAT, 0644);
 	if (fd < 0)
         err_sys("can't open lock file");
 	
@@ -64,7 +57,6 @@ int lock_daemon(void)
 	if (fcntl(fd, F_SETLK, &fl) < 0) {
 		if (errno == EACCES || errno == EAGAIN) {
             close(fd);
-            close(lock_dir);
             return 1;
 		}
 		err_sys("fctnl");
