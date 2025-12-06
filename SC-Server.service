@@ -1,0 +1,15 @@
+[Unit]
+Wants=network-online.target
+After=network-online.target nss-lookup.target
+
+[Service]
+Type=forking
+User=root
+ExecStart=/home/kris/Docs/Project-System-Control/SC-Server --daemoned
+
+PIDFile=/var/lib/SC-Server.d/daemoned.lock
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

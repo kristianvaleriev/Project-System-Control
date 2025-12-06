@@ -92,10 +92,7 @@ char* get_host_addr(struct sockaddr* addr, struct addrinfo* hint)
 
         struct sockaddr* saddr = ptr->ifa_addr;
 
-        if (hint && saddr->sa_family == hint->ai_family)
-            ret_addr = malloc(hint->ai_addrlen);
-
-        else {
+        if (!hint) {
             if (saddr->sa_family == AF_INET)
                 ret_addr = malloc(INET_ADDRSTRLEN);
             else if (saddr->sa_family == AF_INET6)
@@ -103,6 +100,8 @@ char* get_host_addr(struct sockaddr* addr, struct addrinfo* hint)
             else 
                 continue;
         }
+	else if (saddr->sa_family == hint->ai_family)
+ 	    ret_addr = malloc(hint->ai_addrlen);
 
         if (inet_ntop(saddr->sa_family, 
                       convert_addr(saddr),
