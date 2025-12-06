@@ -74,7 +74,7 @@ int get_listening_socket(struct addrinfo* binded_ai)
 * interfaces so it doesnt matter which one (I guess
 * ofc, I am not an expert).
 */
-char* get_host_addr(struct sockaddr* addr)
+char* get_host_addr(struct sockaddr* addr, struct addrinfo* hint)
 {
     char* ret_addr = 0;
     struct ifaddrs* result, *ptr;
@@ -92,12 +92,17 @@ char* get_host_addr(struct sockaddr* addr)
 
         struct sockaddr* saddr = ptr->ifa_addr;
 
-        if (saddr->sa_family == AF_INET)
-            ret_addr = malloc(INET_ADDRSTRLEN);
-        else if (saddr->sa_family == AF_INET6)
-            ret_addr = malloc(INET6_ADDRSTRLEN);
-        else 
-            continue;
+        if (hint && saddr->sa_family == hint->ai_family)
+            ret_addr = malloc(hint->ai_addrlen);
+
+        else {
+            if (saddr->sa_family == AF_INET)
+                ret_addr = malloc(INET_ADDRSTRLEN);
+            else if (saddr->sa_family == AF_INET6)
+                ret_addr = malloc(INET6_ADDRSTRLEN);
+            else 
+                continue;
+        }
 
         if (inet_ntop(saddr->sa_family, 
                       convert_addr(saddr),
@@ -138,13 +143,14 @@ int get_wait_time(void)
     return ret;
 }
 
-void* multicast_beacon(void* _)
+void* multicast_beacon(void* arg)
 {
     static size_t counter;
+    struct addrinfo* hint = (struct addrinfo*) arg;
     struct sockaddr server_addr;
     char* p_addr;
 
-    while (!(p_addr = get_host_addr(&server_addr))) {
+    while (!(p_addr = get_host_addr(&server_addr, hint))) {
         info_msg("could not get host ip address of a listening network interface x%d", ++counter);
 	sleep(2);
     }

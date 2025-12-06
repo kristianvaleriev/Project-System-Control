@@ -63,7 +63,7 @@ int main(int argc, char** argv)
      *    would be difficult to do with a child proc.
      */
     pthread_t beacon_thread;
-    pthread_create(&beacon_thread, 0, multicast_beacon, NULL);
+    pthread_create(&beacon_thread, 0, multicast_beacon, (void*) &server_ip);
 
     struct sockaddr_storage client_addr = {0};
     socklen_t sockaddr_size;
