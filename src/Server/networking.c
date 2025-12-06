@@ -81,7 +81,7 @@ char* get_host_addr(struct sockaddr* addr)
     getifaddrs(&result);
 
     if (!result) 
-        err_info("empty host address result")
+        err_info("empty host address result");
 
     for (ptr = result; ptr; ptr=ptr->ifa_next)
     {
@@ -140,11 +140,13 @@ int get_wait_time(void)
 
 void* multicast_beacon(void* _)
 {
+    static size_t counter;
     struct sockaddr server_addr;
-    char* p_addr = get_host_addr(&server_addr);
-    if (!p_addr) {
-        info_msg("could not get host ip address of a listening network interface");
-        return (void*) 1;
+    char* p_addr;
+
+    while (!(p_addr = get_host_addr(&server_addr))) {
+        info_msg("could not get host ip address of a listening network interface x%d", ++counter);
+	sleep(2);
     }
 
     // Here is hoping nobody notices this race cond.
