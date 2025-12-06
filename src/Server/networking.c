@@ -100,8 +100,8 @@ char* get_host_addr(struct sockaddr* addr, struct addrinfo* hint)
             else 
                 continue;
         }
-	else if (saddr->sa_family == hint->ai_family)
- 	    ret_addr = malloc(hint->ai_addrlen);
+        else if (saddr->sa_family == hint->ai_family)
+            ret_addr = malloc(hint->ai_addrlen);
 
         if (inet_ntop(saddr->sa_family, 
                       convert_addr(saddr),
@@ -150,8 +150,8 @@ void* multicast_beacon(void* arg)
     char* p_addr;
 
     while (!(p_addr = get_host_addr(&server_addr, hint))) {
-        info_msg("could not get host ip address of a listening network interface x%d", ++counter);
-	sleep(2);
+        info_msg("couldn't get host IP address of the listening network interface x%d", ++counter);
+        sleep(2);
     }
 
     // Here is hoping nobody notices this race cond.

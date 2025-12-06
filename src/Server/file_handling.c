@@ -188,7 +188,6 @@ static void restore_working_dir(void)
 
 static void create_makefile(char* filename, size_t len)
 {
-
 #define OBJM "obj-m += "
 
     int fd = open("Makefile", O_WRONLY | O_CREAT | O_TRUNC, ACCESS_MODE);

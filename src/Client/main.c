@@ -80,7 +80,7 @@ int main(int argc, char** argv)
 }
     if (!server_addr) 
     {
-        server_addr = malloc(INET6_ADDRSTRLEN);
+        server_addr = calloc(INET6_ADDRSTRLEN, 1);
         if (!server_addr)
             err_sys("malloc failed");
 

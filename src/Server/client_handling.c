@@ -90,7 +90,6 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
                 exit(0);
 
             write(master_fd, cmd_buf, rc);
-            //memset(cmd_buf, 0, sizeof cmd_buf);
         }
         
         // Was wondering why the server takes so long to respond 
@@ -151,7 +150,7 @@ static void set_signals(void)
     struct sigaction sig_chld;
     sig_chld.sa_handler = exit_handler;
     sig_chld.sa_flags = SA_RESTART;
-    sigemptyset(&sig_chld.sa_mask);   // no need to turn off signals
+    sigemptyset(&sig_chld.sa_mask);   
     
     if (sigaction(SIGCHLD, &sig_chld, NULL) < 0)
         err_sys("sigaction failed");
@@ -190,7 +189,7 @@ static void* reading_function(void* fds)
 
         if (send(*write_fd, buf, size, MSG_NOSIGNAL) < 0) {
             if (errno == EPIPE)
-                info_msg("PIPE"); // <-- hate this signal. It costed me 3 hours
+                info_msg("PIPE"); // <-- & |^|hate this signal. It costed me 3 hours
             else 
                 err_info("reading function's write fail");
             break;
