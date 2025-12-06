@@ -80,6 +80,9 @@ char* get_host_addr(struct sockaddr* addr)
     struct ifaddrs* result, *ptr;
     getifaddrs(&result);
 
+    if (!result) 
+        err_info("empty host address result")
+
     for (ptr = result; ptr; ptr=ptr->ifa_next)
     {
         if (!(ptr->ifa_flags & IFF_UP) ||

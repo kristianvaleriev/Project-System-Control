@@ -37,12 +37,12 @@ static DIR* check_dir(char* dirname, char* path)
 	return ret;
 }
 
-#define LOCK_DIR "daemoned.lock"
+#define LOCK_FILE "daemoned.lock"
 
 int lock_daemon(void)
 {
     char lock_dir[256];
-    snprintf(lock_dir, sizeof lock_dir, "%s/" LOCK_DIR, program_storage);
+    snprintf(lock_dir, sizeof lock_dir, "%s/" LOCK_FILE, program_storage);
 
 	int fd = open(lock_dir, O_RDWR | O_CREAT, 0644);
 	if (fd < 0)
