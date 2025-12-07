@@ -188,14 +188,14 @@ int handle_connection_socket(char* server_addr, size_t addr_size)
 // different and it would be a mess.
 void* reading_server_function(void* fds)
 {
-    int* server_socket = (int*) fds;
-    int* write_fd      = (int*) (fds + sizeof(int));
+    int server_socket = *((int*) fds);
+    int write_fd      = *((int*) (fds + sizeof(int)));
 
     ssize_t size;
     char buf[2049];
     while (1)
     {
-        if ((size = recv(*server_socket, buf, sizeof buf, 0)) < 0) {
+        if ((size = recv(server_socket, buf, sizeof buf, 0)) < 0) {
             err_info("reading function's recv fail");
             continue;;
         }
@@ -207,7 +207,7 @@ void* reading_server_function(void* fds)
         buf[size] = '\0';
         //info_msg("sending buf: %s", buf);
 
-        if (write(*write_fd, buf, size) < 0) {
+        if (write(write_fd, buf, size) < 0) {
             err_info("reading function's write fail");
             break;
         }
