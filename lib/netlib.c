@@ -164,7 +164,7 @@ int multicast_recv(char* group, int domain, int port,
     socklen_t addr_len;
 
     if (domain == AF_INET) {
-        struct sockaddr_in in_buf;
+        volatile struct sockaddr_in in_buf;
         memset(&in_buf, 0, sizeof in_buf);
         in_buf.sin_family = AF_INET;
         in_buf.sin_port   = htons(port);
@@ -174,7 +174,7 @@ int multicast_recv(char* group, int domain, int port,
         addr_len = sizeof in_buf;
     } 
     else {
-        struct sockaddr_in6 in6_buf;
+        volatile struct sockaddr_in6 in6_buf;
         memset(&in6_buf, 0, sizeof in6_buf);
         in6_buf.sin6_family = AF_INET6;
         in6_buf.sin6_port   = htons(port);
