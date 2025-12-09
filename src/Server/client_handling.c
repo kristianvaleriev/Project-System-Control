@@ -179,9 +179,6 @@ static void* reading_function(void* fds)
     while (1)
     {
         if ((size = read(*read_fd, buf, sizeof buf)) < 0) {
-            if (errno == EIO)
-                err_cont(0, "EIO");
-            else
                 err_info("reading function's read fail");
             break;
         }
