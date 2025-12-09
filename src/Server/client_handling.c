@@ -45,7 +45,8 @@ void handle_client(int client_socket)
 
     int rc_err;
     pthread_t reading_thread;
-    if ((rc_err = create_reading_thread(reading_thread, reading_function, master_fd, client_socket)))
+    if ((rc_err = create_reading_thread(reading_thread, reading_function, 
+                                        master_fd, client_socket)))
         err_exit(rc_err, "could not create a reading thread");
 
     main_client_req_loop(client_socket, master_fd, __shell_pid);
@@ -178,9 +179,6 @@ static void* reading_function(void* fds)
     while (1)
     {
         if ((size = read(*read_fd, buf, sizeof buf)) < 0) {
-            if (errno == EIO)
-                err_cont(0, "EIO");
-            else
                 err_info("reading function's read fail");
             break;
         }
@@ -198,5 +196,3 @@ static void* reading_function(void* fds)
 
     return 0;
 }
-
-

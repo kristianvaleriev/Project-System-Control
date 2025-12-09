@@ -97,9 +97,9 @@ int main(int argc, char** argv)
     __server_socket = server_socket; // no choice :(( 
     
     fork_handle_file_send(TYPE_FILES, files);
-    fork_handle_file_send(TYPE_DRIVERS, drivers);
-
     dealloc_filename_array(files);
+
+    fork_handle_file_send(TYPE_DRIVERS, drivers);
     dealloc_filename_array(drivers);
     
     if (set_tty_raw(STDIN_FILENO) < 0) 
@@ -133,7 +133,7 @@ void main_cmd_loop(int server_socket)
     ssize_t rc;
     while (1) 
     {
-        rc = read(STDIN_FILENO, write_buf, sizeof_buf);
+        rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 40, 3);
         if (rc < 0) {
             err_info("read failed");
             break;
