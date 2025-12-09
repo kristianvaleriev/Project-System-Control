@@ -171,28 +171,21 @@ static int recv_wrapper(int socket, void* buf, size_t size)
 
 static void* reading_function(void* fds)
 {
-    int read_fd  = *((int*) fds); 
-    int write_fd = *((int*) (fds + sizeof(int)));
+    int* read_fd  = (int*) fds; 
+    int* write_fd = (int*) (fds + sizeof(int));
 
     ssize_t size;
     char buf[2049];
     while (1)
     {
-<<<<<<< HEAD
-        if ((size = read(read_fd, buf, sizeof buf)) < 0) {
-            if (errno == EIO)
-                err_cont(0, "EIO");
-            else
-=======
         if ((size = read(*read_fd, buf, sizeof buf)) < 0) {
->>>>>>> 2a08e24 (Accumulative read)
                 err_info("reading function's read fail");
             break;
         }
         buf[size] = '\0';
         //info_msg("sending buf: %s", buf);
 
-        if (send(write_fd, buf, size, MSG_NOSIGNAL) < 0) {
+        if (send(*write_fd, buf, size, MSG_NOSIGNAL) < 0) {
             if (errno == EPIPE)
                 info_msg("PIPE"); // <-- & |^|hate this signal. It costed me 3 hours
             else 
