@@ -9,7 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
-#include <signal.h>
+#include <sys/signal.h>
 #include <netdb.h>
 #include <errno.h>
 #include <ifaddrs.h>
@@ -31,30 +31,30 @@ int get_listening_socket(struct addrinfo* binded_ai)
     int socket_fd;
     for (temp_ai = result; temp_ai; temp_ai = temp_ai->ai_next)
     {
-        // Maybe it would look better if I had used continue statements
-        // but that's like 2-3 more lines of code so nah.
-        if ((socket_fd = socket(temp_ai->ai_family, temp_ai->ai_socktype, temp_ai->ai_protocol)) > -1) 
-        {
-            if ( ! setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, 
-                   /*funny-*/ &(int){1}, temp_ai->ai_protocol)) 
-            {
-                if ( ! bind(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen)) 
-                {
-                    if (binded_ai) {
-                        memcpy(binded_ai, temp_ai, sizeof *temp_ai);
+        if ((socket_fd = socket(temp_ai->ai_family, temp_ai->ai_socktype,
+                                temp_ai->ai_protocol)) < 0) 
+            continue;
 
-                        if (temp_ai->ai_canonname) // stupid strdup doesnt check for NULL ptrs...
-                            binded_ai->ai_canonname = strdup(temp_ai->ai_canonname);
-
-                        struct sockaddr* var = malloc(sizeof *var);
-                        *var = *temp_ai->ai_addr; // same as memcpy()
-                        binded_ai->ai_addr = var;
-                    }
-                    break;
-                }
-            } 
-            else socket_fd = -2;
+        if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, 
+            /*funny-*/ &(int){1}, temp_ai->ai_protocol)) {
+            socket_fd = -2;
+            continue;
         }
+        
+        if (bind(socket_fd, temp_ai->ai_addr, temp_ai->ai_addrlen)) 
+            continue;
+
+        if (binded_ai) {
+            memcpy(binded_ai, temp_ai, sizeof *temp_ai);
+
+            if (temp_ai->ai_canonname) // stupid strdup doesnt check for NULL ptrs...
+                binded_ai->ai_canonname = strdup(temp_ai->ai_canonname);
+
+            struct sockaddr* var = malloc(sizeof *var);
+            *var = *temp_ai->ai_addr; // same as memcpy()
+            binded_ai->ai_addr = var;
+        }
+        break;
     }
     freeaddrinfo(result);
 
@@ -69,7 +69,7 @@ int get_listening_socket(struct addrinfo* binded_ai)
 }
 
 /*
-* Return the IP address of one working, not loopback
+* Return the IP address of a working, not a loopback
 * network interface. The server listens on all net 
 * interfaces so it doesnt matter which one (I guess
 * ofc, I am not an expert).

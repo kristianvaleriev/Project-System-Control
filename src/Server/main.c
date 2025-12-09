@@ -109,7 +109,7 @@ void fork_for_client(int listening_socket, int client_socket)
 
     /*
      * Not used by the child process, but it takes resources
-     * so we gave it to our function to make posible freeing it.
+     * so we gave it to our function to make possible freeing it.
      */
     close(listening_socket); 
 
