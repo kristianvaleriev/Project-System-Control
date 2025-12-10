@@ -87,6 +87,7 @@ ssize_t accumulative_read(int fd, char* buf, size_t buf_size, int timeout, int t
         }
         if (!rc) break;
 
+//        info_msg("try #%d: %s", i, buf + ret);
         ret += rc;
         if (ret - 1 >= buf_size)
             break;

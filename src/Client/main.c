@@ -133,7 +133,12 @@ void main_cmd_loop(int server_socket)
     ssize_t rc;
     while (1) 
     {
-        rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 40, 3);
+    #ifndef DONT_ACCUMULATE
+        rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 50, 2);
+    #else
+        rc = write(STDIN_FILENO, write_bufm sizeof_buf);
+    #endif
+
         if (rc < 0) {
             err_info("read failed");
             break;
