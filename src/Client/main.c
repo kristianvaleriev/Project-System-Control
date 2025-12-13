@@ -136,7 +136,7 @@ void main_cmd_loop(int server_socket)
     #ifndef DONT_ACCUMULATE
         rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 50, 2);
     #else
-        rc = write(STDIN_FILENO, write_bufm sizeof_buf);
+        rc = read(STDIN_FILENO, write_buf, sizeof_buf);
     #endif
 
         if (rc < 0) {
