@@ -133,7 +133,7 @@ void main_cmd_loop(int server_socket)
     ssize_t rc;
     while (1) 
     {
-    #ifndef DONT_ACCUMULATE
+    #ifdef ACCUMULATIVE_READ
         rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 50, 2);
     #else
         rc = read(STDIN_FILENO, write_buf, sizeof_buf);
@@ -143,6 +143,7 @@ void main_cmd_loop(int server_socket)
             err_info("read failed");
             break;
         }
+        write_buf[rc] = '\0';
 
         if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) < 0)
             break;
@@ -196,23 +197,23 @@ void* reading_server_function(void* fds)
     int server_socket = *((int*) fds);
     int write_fd      = *((int*) (fds + sizeof(int)));
 
-    ssize_t size;
-    char buf[2049];
+    ssize_t rc;
+    char buf[2049] = {0};
     while (1)
     {
-        if ((size = recv(server_socket, buf, sizeof buf, 0)) < 0) {
+        if ((rc = recv(server_socket, buf, sizeof buf, 0)) < 0) {
             err_info("reading function's recv fail");
             continue;;
         }
-        else if (!size) {
+        else if (!rc) {
             info_msg("Server connection's off. Exiting...\n\r");
             exit(0);
         }
 
-        buf[size] = '\0';
+        buf[rc] = '\0';
         //info_msg("sending buf: %s", buf);
 
-        if (write(write_fd, buf, size) < 0) {
+        if (write(write_fd, buf, rc) < 0) {
             err_info("reading function's write fail");
             break;
         }

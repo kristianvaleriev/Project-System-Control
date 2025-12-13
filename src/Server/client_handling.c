@@ -90,6 +90,7 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
             if(!rc)
                 exit(0);
 
+            cmd_buf[rc] = '\0';
             write(master_fd, cmd_buf, rc);
         }
         
@@ -175,7 +176,7 @@ static void* reading_function(void* fds)
     int* write_fd = (int*) (fds + sizeof(int));
 
     ssize_t size;
-    char buf[2049];
+    char buf[2049] = {0};
     while (1)
     {
         if ((size = read(*read_fd, buf, sizeof buf)) < 0) {
