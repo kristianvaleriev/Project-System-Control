@@ -162,9 +162,9 @@ static int init_logging_shell(int fd)
 static void term_reading_function(int read_fd, int write_fd)
 {
     static char buf[1024];
-    ssize_t size;
+    ssize_t size = 0, rc;
 
-    if ((size = read(read_fd, buf, sizeof buf)) <= 0) {
+    if ((rc = read(read_fd, buf, sizeof buf)) <= 0) {
         if (!size)
             return;
         if (errno == EIO)
@@ -172,8 +172,12 @@ static void term_reading_function(int read_fd, int write_fd)
         else
             err_info("reading function's read fail");
     }
-    buf[size] = '\0';
+    //buf[size] = '\0';
     //info_msg("sending buf: %s", buf);
+
+    for (ssize_t i = 0; i < rc; i++)
+        if (buf[i] != '\0')
+            buf[size++] = buf[i];
 
     if (send(write_fd, buf, size, MSG_NOSIGNAL) < 0) {
         if (errno == EPIPE)
