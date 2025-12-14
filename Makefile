@@ -4,8 +4,6 @@ client_name ?= "SC-Client"
 CLIENT_DIR=./src/Client/
 SERVER_DIR=./src/Server/
 
-CFLAGS ?= -O3
-
 all: client server 
 
 client:

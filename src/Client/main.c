@@ -134,7 +134,7 @@ void main_cmd_loop(int server_socket)
     while (1) 
     {
     #ifdef ACCUMULATIVE_READ
-        rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 50, 2);
+            rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 40, 2);
     #else
         rc = read(STDIN_FILENO, write_buf, sizeof_buf);
     #endif
