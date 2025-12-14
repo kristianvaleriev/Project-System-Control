@@ -67,9 +67,6 @@ static void set_nonblocking(int fd)
 
 static void main_client_req_loop(int client_socket, int master_fd, int pid)
 {
-    int rc;
-    struct client_request req = {0};
-
     set_nonblocking(client_socket);
     set_nonblocking(master_fd);
 
@@ -84,12 +81,13 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
         },
     };
 
+    int rc;
     char cmd_buf[128] = {0};
     while (1)
     {
-        if (poll(pfds, sizeof pfds / sizeof *pfds, 0) < 0)
-            err_sys("poll at server loop failed");
-
+        while ((rc = poll(pfds, sizeof pfds / sizeof *pfds, 0) <= 0))
+            if (rc < 0)
+                err_sys("poll at server loop failed");
 
         if (pfds[0].revents & POLLIN) {
             if (client_req_handle(client_socket, master_fd) > 1) {
