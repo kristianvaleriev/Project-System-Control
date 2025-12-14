@@ -84,7 +84,6 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
     };
 
     int rc;
-    char cmd_buf[128] = {0};
     while (1)
     {
         while ((rc = poll(pfds, sizeof pfds / sizeof *pfds, 0) <= 0)) {
@@ -162,10 +161,10 @@ static int init_logging_shell(int fd)
 static void term_reading_function(int read_fd, int write_fd)
 {
     static char buf[1024];
-    ssize_t size = 0, rc;
+    ssize_t rc;
 
     if ((rc = read(read_fd, buf, sizeof buf)) <= 0) {
-        if (!size)
+        if (!rc)
             return;
         if (errno == EIO)
             err_cont(0, "EIO");
@@ -175,11 +174,7 @@ static void term_reading_function(int read_fd, int write_fd)
     //buf[size] = '\0';
     //info_msg("sending buf: %s", buf);
 
-    for (ssize_t i = 0; i < rc; i++)
-        if (buf[i] != '\0')
-            buf[size++] = buf[i];
-
-    if (send(write_fd, buf, size, MSG_NOSIGNAL) < 0) {
+    if (send(write_fd, buf, rc, MSG_NOSIGNAL) < 0) {
         if (errno == EPIPE)
             info_msg("PIPE"); // <-- & |^|hate this signal. It costed me 3 hours
         else 
@@ -192,7 +187,7 @@ static int client_req_handle(int client_socket, int master_fd)
     static char cmd_buf[64];
 
     struct client_request req;
-    ssize_t rc;
+    ssize_t rc, size;
 
     if ((rc = recv(client_socket, &req, sizeof req, 0)) <= 0)  {
         if (!rc)
@@ -223,8 +218,14 @@ static int client_req_handle(int client_socket, int master_fd)
             return -1;
         }
 
-        cmd_buf[rc] = '\0';
-        write(master_fd, cmd_buf, rc);
+        size = 0;
+        for (ssize_t i = 0; i < rc; i++) {
+            // somehow those weren't the same STUPID thing on rpi4
+            if (cmd_buf[i] == 0 /*|| cmd_buf[i] == '\0'*/) 
+                cmd_buf[size++] = cmd_buf[i];
+        }
+
+        write(master_fd, cmd_buf, size);
     }
 
     return 0;

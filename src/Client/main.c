@@ -127,8 +127,9 @@ void main_cmd_loop(int server_socket)
 
     char buf[128] = {0};
     size_t offset = sizeof(struct client_request);
-    char*  write_buf = buf + offset;
     size_t sizeof_buf = (sizeof buf) - offset;
+
+    char*  write_buf = buf + offset;
 
     ssize_t rc;
     while (1) 
@@ -136,14 +137,12 @@ void main_cmd_loop(int server_socket)
     #ifdef ACCUMULATIVE_READ
             rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 40, 2);
     #else
-        rc = read(STDIN_FILENO, write_buf, sizeof_buf);
-    #endif
-
-        if (rc < 0) {
-            err_info("read failed");
+        if ((rc = read(STDIN_FILENO, write_buf, sizeof_buf)) <= 0) {
+            if (rc)
+                err_info("read failed");
             break;
         }
-        write_buf[rc] = '\0';
+    #endif
 
         if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) < 0)
             break;
@@ -201,16 +200,16 @@ void* reading_server_function(void* fds)
     char buf[2049] = {0};
     while (1)
     {
-        if ((rc = recv(server_socket, buf, sizeof buf, 0)) < 0) {
-            err_info("reading function's recv fail");
-            continue;;
-        }
-        else if (!rc) {
-            info_msg("Server connection's off. Exiting...\n\r");
-            exit(0);
-        }
+        if ((rc = recv(server_socket, buf, sizeof buf, 0)) <= 0) {
+            if (!rc) {
+                info_msg("Server connection's off. Exiting...\n\r");
+                exit(0);
+            }
 
-        buf[rc] = '\0';
+            err_info("reading function's recv fail");
+            continue;
+        }
+        //buf[rc] = '\0';
         //info_msg("sending buf: %s", buf);
 
         if (write(write_fd, buf, rc) < 0) {
