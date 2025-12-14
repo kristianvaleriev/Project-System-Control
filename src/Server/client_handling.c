@@ -198,15 +198,13 @@ static int client_req_handle(int client_socket, int master_fd)
         req.type = ntohl(req.type);
         req.data_size = ntohl(req.data_size);
 
-        if (!(req.type > 0 || req.type < TYPE_COUNT)) {
+        if (!(req.type > 0 && req.type < TYPE_COUNT)) {
             err_cont(0, "detecting not defined reqeust type! "
                      "\"Are you certain whatever you're doing is worth it?\"");
             return -1;
         }
 
         action_array[req.type](client_socket, master_fd, &req);
-
-        memset(&req, 0, sizeof req);
     }
 
     else { // just a bash cmd
