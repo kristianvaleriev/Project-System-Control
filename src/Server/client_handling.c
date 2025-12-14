@@ -3,6 +3,7 @@
 #include "../../include/utils.h"
 
 #include <asm-generic/errno-base.h>
+#include <fcntl.h>
 #include <pty.h>
 #include <pthread.h>
 #include <signal.h>
@@ -57,13 +58,20 @@ void handle_client(int client_socket)
     exit(0);
 }
 
-
-static int  recv_wrapper(int, void*, size_t);
+static void set_nonblocking(int fd) 
+{
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK)) 
+        err_sys("fcntl");
+}
 
 static void main_client_req_loop(int client_socket, int master_fd, int pid)
 {
     int rc;
     struct client_request req = {0};
+
+    set_nonblocking(client_socket);
+    set_nonblocking(master_fd);
 
     struct pollfd pfds[] = {
         {
@@ -82,15 +90,16 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
         if (poll(pfds, sizeof pfds / sizeof *pfds, 0) < 0)
             err_sys("poll at server loop failed");
 
-        if (pfds[1].revents & POLLIN)             
-            term_reading_function(master_fd, client_socket);
 
-        else if (pfds[0].revents & POLLIN) {
+        if (pfds[0].revents & POLLIN) {
             if (client_req_handle(client_socket, master_fd) > 1) {
                 info_msg("client has left.");
                 exit(0);
             }
         }
+        else if (pfds[1].revents & POLLIN)             
+            term_reading_function(master_fd, client_socket);
+
         else if (pfds[0].revents & POLLHUP ||
                  pfds[1].revents & POLLHUP) {
             info_msg("client has left. (poll revent is HUP)");
@@ -132,7 +141,6 @@ static pid_t handle_child_exec(int* fd)
 
 static int init_logging_shell(int fd)
 {
-    
     if (dup2(fd, STDIN_FILENO)  != STDIN_FILENO)
         return -2;
     if (dup2(fd, STDOUT_FILENO) != STDOUT_FILENO)
@@ -179,12 +187,12 @@ static int client_req_handle(int client_socket, int master_fd)
     struct client_request req;
     ssize_t rc;
 
-    if ((rc = recv(client_socket, &req, sizeof req, 0)) < 0)  {
+    if ((rc = recv(client_socket, &req, sizeof req, 0)) <= 0)  {
+        if (!rc)
+            return 1;
         err_info("recv of client_req failed");
         return -1;
     }
-    if (!rc)
-        return 1;
 
     if (req.type) 
     {
@@ -201,14 +209,14 @@ static int client_req_handle(int client_socket, int master_fd)
 
         memset(&req, 0, sizeof req);
     }
+
     else { // just a bash cmd
-        if ((rc = recv(client_socket, cmd_buf, sizeof cmd_buf, 0)) < 0)  {
+        if ((rc = recv(client_socket, cmd_buf, sizeof cmd_buf, 0)) <= 0)  {
+            if (!rc)
+                return 1;
             err_info("recv of client cmd failed");
             return -1;
         }
-
-        if(!rc)
-            return 1;
 
         cmd_buf[rc] = '\0';
         write(master_fd, cmd_buf, rc);
