@@ -28,10 +28,12 @@ static pid_t __shell_pid = -1;
 static void   set_signals(void);
 static pid_t  handle_child_exec(int* fd);
 static int    init_logging_shell(int fd);
+
 static void   main_client_req_loop(int client_socket, 
                                    int master_fd,int pid);
 static void   term_reading_function(int,int);
 static int    client_req_handle(int,int);
+
 
 static void   exit_handler(int signo)
 {
@@ -162,7 +164,9 @@ static void term_reading_function(int read_fd, int write_fd)
     static char buf[1024];
     ssize_t size;
 
-    if ((size = read(read_fd, buf, sizeof buf)) < 0) {
+    if ((size = read(read_fd, buf, sizeof buf)) <= 0) {
+        if (!size)
+            return;
         if (errno == EIO)
             err_cont(0, "EIO");
         else
