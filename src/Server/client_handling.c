@@ -164,12 +164,13 @@ static void term_reading_function(int read_fd, int write_fd)
     ssize_t rc;
 
     if ((rc = read(read_fd, buf, sizeof buf)) <= 0) {
-        if (!rc)
-            return;
-        if (errno == EIO)
-            err_cont(0, "EIO");
-        else
-            err_info("reading function's read fail");
+        if (rc) {
+            if (errno == EIO)
+                err_cont(0, "EIO");
+            else
+                err_info("reading function's read fail");
+        }
+        return;
     }
     //buf[size] = '\0';
     //info_msg("sending buf: %s", buf);
@@ -221,7 +222,7 @@ static int client_req_handle(int client_socket, int master_fd)
         size = 0;
         for (ssize_t i = 0; i < rc; i++) {
             // somehow those weren't the same STUPID thing on rpi4
-            if (cmd_buf[i] == 0 /*|| cmd_buf[i] == '\0'*/) 
+            if (cmd_buf[i] != 0 /*|| cmd_buf[i] == '\0'*/) 
                 cmd_buf[size++] = cmd_buf[i];
         }
 

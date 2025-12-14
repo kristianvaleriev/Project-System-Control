@@ -140,7 +140,7 @@ void main_cmd_loop(int server_socket)
         if ((rc = read(STDIN_FILENO, write_buf, sizeof_buf)) <= 0) {
             if (rc)
                 err_info("read failed");
-            break;
+            continue;
         }
     #endif
 
@@ -197,7 +197,7 @@ void* reading_server_function(void* fds)
     int write_fd      = *((int*) (fds + sizeof(int)));
 
     ssize_t rc;
-    char buf[2049] = {0};
+    char buf[2048] = {0};
     while (1)
     {
         if ((rc = recv(server_socket, buf, sizeof buf, 0)) <= 0) {
