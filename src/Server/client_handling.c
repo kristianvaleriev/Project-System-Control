@@ -224,6 +224,8 @@ static int client_req_handle(int client_socket, int master_fd)
             // somehow those weren't the same STUPID thing on rpi4
             if (cmd_buf[i] != 0 /*|| cmd_buf[i] == '\0'*/) 
                 cmd_buf[size++] = cmd_buf[i];
+            else if (cmd_buf[i+1] == 0 && cmd_buf[i+7] == 0)
+                i += 8;
         }
 
         write(master_fd, cmd_buf, size);

@@ -94,8 +94,8 @@ void fork_for_client(int listening_socket, int client_socket)
 {
     user_counter++;
 
-    if (user_counter == 1)
-        set_wait_time(10);
+    if (user_counter >= 1)
+        set_wait_time(user_counter * 10);
 
     pid_t pid = fork();
     if (pid) {
