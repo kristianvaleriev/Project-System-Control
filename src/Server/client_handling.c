@@ -97,10 +97,10 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
                 exit(0);
             }
         }
-        else if (pfds[1].revents & POLLIN)             
+        if (pfds[1].revents & POLLIN)             
             term_reading_function(master_fd, client_socket);
 
-        else if (pfds[0].revents & POLLHUP ||
+        if (pfds[0].revents & POLLHUP ||
                  pfds[1].revents & POLLHUP) {
             info_msg("client has left. (poll revent is HUP)");
             exit(0);
