@@ -7,6 +7,8 @@
 * Error handling
 */ 
 
+int set_ncurse_err_mode(int);
+
 void err_quit_msg(const char *fmt, ...);
 void err_quit_msg(const char *fmt, ...);
 void err_dump_abort(const char *fmt, ...);

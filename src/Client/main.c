@@ -7,21 +7,24 @@
 #include <sys/signal.h>
 #include <sys/ioctl.h>
 #include <pthread.h>
-#include <time.h>
-#include <unistd.h>
 #include <termios.h>
-#include <errno.h>
+#include <ncurses.h>
 #include <getopt.h>
+#include <unistd.h>
+#include <errno.h>
+#include <time.h>
 
 #include "tty_conf.h"
-#include "client_networking.h"
 #include "dynamic_files.h"
+#include "client_ncurses.h"
+#include "client_networking.h"
 
-#define SHORT_ARGS "-a:f:d:"
+#define SHORT_ARGS "-a:f:d:n"
 static struct option long_options[] = {
     { "address",  required_argument, NULL, 'a'},
     { "drivers",  required_argument, NULL, 'd'},
     { "files",    required_argument, NULL, 'f'},
+    { "no-ncurse", no_argument, NULL, 'n'},
     {},
 };
 
@@ -41,12 +44,12 @@ void    main_cmd_loop(int);
 
 int main(int argc, char** argv)
 {
+    int using_ncurses = 1;
     char* server_addr = NULL;
     struct filename_array* drivers = init_filename_array();
     struct filename_array* files   = init_filename_array();
 
     set_program_name(argv[0]);
-
 {
     char ch_arg, temp = 0; 
     while ((ch_arg = getopt_long(argc, argv, SHORT_ARGS, long_options, NULL)) != -1)
@@ -65,6 +68,9 @@ int main(int argc, char** argv)
         case 'd': insert_in_array(drivers, optarg, strlen(optarg));
         break;
 
+        case 'n': using_ncurses = 0;
+        break;
+
         case 1:
             if (temp == 'f')
                 insert_in_array(files, optarg, strlen(optarg));
@@ -78,6 +84,18 @@ int main(int argc, char** argv)
         temp = ch_arg;
     }
 }
+
+    if (set_tty_raw(STDIN_FILENO) < 0) 
+        err_sys("could not set raw tty mode");
+    // Very funny if that here is missing (bad tho :\)
+    // *resets terminal to it's original state*
+    if (atexit(set_tty_atexit))
+        err_sys("atexit failed");
+
+    if (using_ncurses) 
+        if (setup_client_ncurses() < 0)
+            err_cont(0, "Client setup of ncurses library failed! Continuing...");
+
     if (!server_addr) 
     {
         server_addr = calloc(INET6_ADDRSTRLEN, 1);
@@ -101,18 +119,13 @@ int main(int argc, char** argv)
 
     fork_handle_file_send(TYPE_DRIVERS, drivers);
     dealloc_filename_array(drivers);
-    
-    if (set_tty_raw(STDIN_FILENO) < 0) 
-        err_sys("could not set raw tty mode");
-    // Very funny if that here is missing (bad tho :\)
-    // *resets terminal to it's original state*
-    if (atexit(set_tty_atexit)) 
-        err_sys("atexit failed");
 
     send_winsize_info(0);
     set_signals();
     
     free(server_addr);
+
+
     main_cmd_loop(server_socket);
 
 
@@ -146,6 +159,7 @@ void main_cmd_loop(int server_socket)
 
         if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) < 0)
             break;
+
     }
 }
 

@@ -17,6 +17,28 @@
 
 extern char* program_name;
 
+
+#ifndef WITHOUT_NCURSE
+#include <ncurses.h>
+
+static int using_ncurses;
+
+int set_ncurse_err_mode(int val) 
+{
+    using_ncurses = val;
+    return 0;
+}
+
+#else
+
+int set_ncurse_err_mode(int val)
+{
+    return 1;
+}
+
+#endif
+
+
 // Server specific logic
 static int is_daemon;
 int priority = LOG_NOTICE;
@@ -26,6 +48,7 @@ void init_syslog(char* name, int option, int facility)
     openlog(name, option, facility);
     is_daemon = 1;
 }
+
 
 static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
 {
@@ -43,6 +66,15 @@ static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
     strcat(buf, "\n\r");
 
     if (!is_daemon) {
+        #ifndef WITHOUT_NCURSE
+        if (using_ncurses) {
+            printw("%s", buf);
+            refresh();
+
+            return;
+        }
+        #endif
+
         fflush(stdout); /* in case stdout and stderr are the same */
         fputs(buf, stderr);
         fflush(NULL); /* flushes all stdio output streams */

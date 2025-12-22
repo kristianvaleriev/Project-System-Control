@@ -7,10 +7,12 @@ SERVER_DIR=./src/Server/
 all: client server 
 
 client:
+	@touch ./lib/error_handling.c
 	$(MAKE) -C $(CLIENT_DIR) PROG_NAME=$(client_name)
 	@mv $(CLIENT_DIR)/$(client_name) ./
 
 server:
+	@touch ./lib/error_handling.c
 	$(MAKE) -C $(SERVER_DIR) PROG_NAME=$(server_name)
 	@mv $(SERVER_DIR)/$(server_name) ./
 
