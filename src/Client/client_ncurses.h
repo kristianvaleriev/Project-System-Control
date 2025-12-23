@@ -3,9 +3,9 @@
 
 #include <ncurses.h>
 
-void setup_ncurses(void);
-int   setup_client_ncurses(void);
-void  make_panel(WINDOW** frame, WINDOW** pane,
+void    setup_ncurses(void);
+void*   setup_client_ncurses(void*);
+void    make_panel(WINDOW** frame, WINDOW** pane,
                 int rows, int cols, int startx, int starty);
 
 

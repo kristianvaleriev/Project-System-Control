@@ -13,10 +13,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
+#include <pthread.h>
 
 #include "tty_conf.h"
 #include "dynamic_files.h"
-#include "client_ncurses.h"
 #include "client_networking.h"
 
 #define SHORT_ARGS "-a:f:d:n"
@@ -30,6 +30,17 @@ static struct option long_options[] = {
 
 static int __server_socket = -1;
 static pthread_t reading_thread;
+
+#ifndef WITHOUT_NCURSES
+    #include "client_ncurses.h"
+
+    static pthread_t ncurses_thread;
+
+    extern pthread_mutex_t setup_lock;
+    extern pthread_cond_t setup_cond;
+
+    extern int is_setup_done;
+#endif
 
 char* program_name = 0;
 char* program_storage = (char*) -1;
@@ -92,9 +103,18 @@ int main(int argc, char** argv)
     if (atexit(set_tty_atexit))
         err_sys("atexit failed");
 
-    if (using_ncurses) 
-        if (setup_client_ncurses() < 0)
-            err_cont(0, "Client setup of ncurses library failed! Continuing...");
+#ifndef WITHOUT_NCURSES
+    if (using_ncurses) {
+        int status = pthread_create(&ncurses_thread, NULL, setup_client_ncurses, NULL);
+        if (status)
+            err_cont(status, "Client setup of ncurses library failed! Continuing...");
+    
+        pthread_mutex_lock(&setup_lock);
+        while (!is_setup_done)
+            pthread_cond_wait(&setup_cond, &setup_lock);
+        pthread_mutex_unlock(&setup_lock);
+    }
+#endif
 
     if (!server_addr) 
     {
