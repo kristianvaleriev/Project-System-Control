@@ -95,3 +95,10 @@ ssize_t accumulative_read(int fd, char* buf, size_t buf_size, int timeout, int t
 
     return ret;
 }
+
+void set_nonblocking(int fd) 
+{
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK)) 
+        err_sys("fcntl");
+}

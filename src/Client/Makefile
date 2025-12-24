@@ -4,7 +4,7 @@ src += $(wildcard ../../lib/*.c)
 obj = $(src:.c=.o)
 dep = $(obj:.o=.d)
 
-CFLAGS += -MMD -lncurses -g
+CFLAGS += -MMD -lncurses -lvterm -g
 
 all: $(obj)
 	$(CC) $(CFLAGS) -o $(PROG_NAME) $^

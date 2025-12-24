@@ -105,6 +105,7 @@ int main(int argc, char** argv)
 
 #ifndef WITHOUT_NCURSES
     if (using_ncurses) {
+        /*
         int status = pthread_create(&ncurses_thread, NULL, setup_client_ncurses, NULL);
         if (status)
             err_cont(status, "Client setup of ncurses library failed! Continuing...");
@@ -113,6 +114,9 @@ int main(int argc, char** argv)
         while (!is_setup_done)
             pthread_cond_wait(&setup_cond, &setup_lock);
         pthread_mutex_unlock(&setup_lock);
+        */
+
+        setup_client_ncurses(0);
     }
 #endif
 

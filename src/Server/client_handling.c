@@ -37,8 +37,10 @@ static int    client_req_handle(int,int);
 
 static void   exit_handler(int signo)
 {
-    if (waitpid(__shell_pid, NULL, WNOHANG)) 
-        _exit(0);
+    int status;
+    if (waitpid(__shell_pid, &status, WNOHANG)) 
+        if (WIFEXITED(status))
+            _exit(0);
 }
 
 void handle_client(int client_socket)
@@ -60,12 +62,7 @@ void handle_client(int client_socket)
     exit(0);
 }
 
-static void set_nonblocking(int fd) 
-{
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK)) 
-        err_sys("fcntl");
-}
+
 
 static void main_client_req_loop(int client_socket, int master_fd, int pid)
 {

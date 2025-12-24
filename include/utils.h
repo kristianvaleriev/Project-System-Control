@@ -28,6 +28,7 @@ void  set_program_storage(const char* prefix);
 
 ssize_t accumulative_read(int fd, char* buf, size_t buf_size, int timeout, int tries);
 char* make_directory(const char*, const char*, const char*);
+void set_nonblocking(int fd);
 
 #define create_reading_thread(thd, func, read_fd, write_fd)           \
                    pthread_create(&thd, NULL, func, \
