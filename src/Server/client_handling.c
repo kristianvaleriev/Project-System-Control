@@ -37,10 +37,8 @@ static int    client_req_handle(int,int);
 
 static void   exit_handler(int signo)
 {
-    int status;
-    if (waitpid(__shell_pid, &status, WNOHANG)) 
-        if (WIFEXITED(status))
-            _exit(0);
+    if (waitpid(__shell_pid, NULL, WNOHANG)) 
+        _exit(0);
 }
 
 void handle_client(int client_socket)

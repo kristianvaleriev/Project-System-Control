@@ -6,8 +6,8 @@
 #include <ncurses.h>
 #include <vterm.h>
 
-static VTerm* vt;
-static VTermScreen* vts;
+VTerm* vt;
+VTermScreen* vts;
 
 // Represents one cell in our snapshot
 typedef struct {
@@ -26,10 +26,11 @@ static int prev_cols = 0;
  * Renders only changed cells from vterm to ncurses,
  * and positions the ncurses cursor to the vterm cursor.
  */
-void render_vterm_diff(void) 
+void render_vterm_diff(WINDOW* display) 
 {
     int rows, cols;
-    getmaxyx(stdscr, rows, cols);
+    getmaxyx(display, rows, cols);
+    //info_msg("test2: %d %d", rows, cols);
 
     // Reallocate snapshot if size has changed
     if (!prev_screen || rows != prev_rows || cols != prev_cols) {
@@ -37,6 +38,8 @@ void render_vterm_diff(void)
         prev_rows = rows;
         prev_cols = cols;
         prev_screen = calloc(rows * cols, sizeof(Cell));
+
+        vterm_set_size(vt, rows, cols);
     }
 
     // Temporary local buffer before applying updates
@@ -47,15 +50,15 @@ void render_vterm_diff(void)
     VTermPos vpos;
     vterm_state_get_cursorpos(vstate, &vpos);
 
-    for (int r = 0; r < (rows - rows * 0.25); r++) 
+    for (int r = 0; r < rows; r++) 
     {
         for (int c = 0; c < cols; c++) 
         {
             if (!vterm_screen_get_cell(vts, (VTermPos){r, c}, &cell))
                 continue;
 
-            char ch   = cell.chars[0] ? cell.chars[0] : ' ';
-            short fg  = -1;  // indexed color (0..255)
+            char  ch = cell.chars[0] ? cell.chars[0] : ' ';
+            short fg = -1; // indexed color (0..255)
 
             // Get snapshot index
             int idx = r * cols + c;
@@ -67,24 +70,19 @@ void render_vterm_diff(void)
                 prev_screen[idx].ch = ch;
                 prev_screen[idx].fg = fg;
 
-                // Set color if needed (optional)
-                if (fg >= 0) {
-                    attron(COLOR_PAIR(fg + 1));
-                }
+                if (fg >= 0)
+                    wattron(display, COLOR_PAIR(fg + 1));
 
-                // Draw to ncurses
-                mvaddch(r, c, ch);
+                mvwaddch(display, r, c, ch);
 
-                if (fg >= 0) {
-                    attroff(COLOR_PAIR(fg + 1));
-                }
+                if (fg >= 0) 
+                    wattroff(display, COLOR_PAIR(fg + 1));
             }
         }
     }
 
-    move(vpos.row, vpos.col);
-
-    refresh();
+    wmove(display, vpos.row, vpos.col);
+    wrefresh(display);
 }
 
 void render_vterm_to_ncurses(void)

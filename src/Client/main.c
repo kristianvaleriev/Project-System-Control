@@ -2,7 +2,9 @@
 #include "../../include/utils.h"
 #include "../../include/network.h"
 
+#include <asm-generic/errno.h>
 #include <netinet/in.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/signal.h>
 #include <sys/ioctl.h>
@@ -28,9 +30,6 @@ static struct option long_options[] = {
     {},
 };
 
-static int __server_socket = -1;
-static pthread_t reading_thread;
-
 #ifndef WITHOUT_NCURSES
     #include "client_ncurses.h"
 
@@ -41,6 +40,9 @@ static pthread_t reading_thread;
 
     extern int is_setup_done;
 #endif
+
+static pthread_t reading_thread;
+volatile sig_atomic_t tty_resized = 1;
 
 char* program_name = 0;
 char* program_storage = (char*) -1;
@@ -103,6 +105,8 @@ int main(int argc, char** argv)
     if (atexit(set_tty_atexit))
         err_sys("atexit failed");
 
+    set_signals();
+
 #ifndef WITHOUT_NCURSES
     if (using_ncurses) {
         /*
@@ -116,7 +120,8 @@ int main(int argc, char** argv)
         pthread_mutex_unlock(&setup_lock);
         */
 
-        setup_client_ncurses(0);
+        if (!handle_ncurses_and_fork())
+            setup_client_ncurses(0);
     }
 #endif
 
@@ -136,7 +141,6 @@ int main(int argc, char** argv)
     }
 
     int server_socket = handle_connection_socket(server_addr, sizeof server_addr);
-    __server_socket = server_socket; // no choice :(( 
     
     fork_handle_file_send(TYPE_FILES, files);
     dealloc_filename_array(files);
@@ -144,12 +148,11 @@ int main(int argc, char** argv)
     fork_handle_file_send(TYPE_DRIVERS, drivers);
     dealloc_filename_array(drivers);
 
-    send_winsize_info(0);
-    set_signals();
-    
     free(server_addr);
 
 
+    pthread_create(&reading_thread, NULL, reading_server_function,
+                   (int[]) {server_socket, STDOUT_FILENO, 1});
     main_cmd_loop(server_socket);
 
 
@@ -159,72 +162,39 @@ int main(int argc, char** argv)
 
 void main_cmd_loop(int server_socket)
 {
-    pthread_create(&reading_thread, NULL, reading_server_function,
-                   (int[]) {server_socket, STDOUT_FILENO, 1});
-
     char buf[128] = {0};
+
     size_t offset = sizeof(struct client_request);
     size_t sizeof_buf = (sizeof buf) - offset;
 
     char*  write_buf = buf + offset;
 
+    set_nonblocking(STDIN_FILENO);
+
     ssize_t rc;
     while (1) 
     {
-    #ifdef ACCUMULATIVE_READ
-            rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 30, 1);
-    #else
-        if ((rc = read(STDIN_FILENO, write_buf, sizeof_buf)) <= 0) {
-            if (rc)
-                err_info("read failed");
-            continue;
+        if (tty_resized) {
+            tty_resized = 0;
+            send_winsize_info(server_socket);
         }
+
+    #ifdef ACCUMULATIVE_READ
+        rc = accumulative_read(STDIN_FILENO, write_buf, sizeof_buf, 30, 1);
+    #else
+        rc = read(STDIN_FILENO, write_buf, sizeof_buf);
     #endif
 
+        if (rc <= 0) {
+            if (rc && errno != EWOULDBLOCK) 
+                err_info("read failed");
+            
+            continue;
+        }
+        
         if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) < 0)
             break;
-
     }
-}
-
-void send_winsize_info(int _)
-{
-    if (!isatty(STDIN_FILENO))
-        return;
-
-    struct winsize win; 
-    if (ioctl(STDIN_FILENO, TIOCGWINSZ, &win) < 0) {
-        err_info("error on retriving window size");
-        return;
-    }
-    struct client_request req = {
-        .data_size = htonl(sizeof win),
-        .type      = htonl(TYPE_WINSIZE),
-    };
-
-    //info_msg("col & rows: %d %d\n\r", wins.ws_col, wins.ws_row);
-    if (sendall(__server_socket, &req, sizeof req, 0) < 0 ||       
-        sendall(__server_socket, &win, sizeof win, 0) < 0)
-        err_info("error on sending request for changing window size");
-}
-
-int handle_connection_socket(char* server_addr, size_t addr_size) 
-{
-    int server_socket = get_connected_socket(server_addr, addr_size);
-    if (server_socket < 0) 
-    {
-        if (server_socket == ERR_GETADDRINFO) {
-            err_quit_msg("getaddrinfo error: %s", gai_strerror(server_socket));
-        }
-        else if (server_socket == ERR_CONNECT){
-            err_sys("connection call failed (errno: %d)", errno);
-        }
-        else 
-            err_sys("error on connection try (err num: %d)", server_socket);
-    }
-
-    info_msg("connection successful\n\n");
-    return server_socket;
 }
 
 // Tried to use the util threaded function, but it is too
@@ -258,10 +228,53 @@ void* reading_server_function(void* fds)
     return 0;
 }
 
+
+void send_winsize_info(int server_socket)
+{
+    if (!isatty(STDIN_FILENO))
+        return;
+
+    struct winsize win; 
+    if (ioctl(STDIN_FILENO, TIOCGWINSZ, &win) < 0) {
+        err_info("error on retriving window size");
+        return;
+    }
+    struct client_request req = {
+        .data_size = htonl(sizeof win),
+        .type      = htonl(TYPE_WINSIZE),
+    };
+
+    //info_msg("col & rows: %d %d\n\r", wins.ws_col, wins.ws_row);
+    if (sendall(server_socket, &req, sizeof req, 0) < 0 ||       
+        sendall(server_socket, &win, sizeof win, 0) < 0)
+        err_info("error on sending request for changing window size");
+}
+
+int handle_connection_socket(char* server_addr, size_t addr_size) 
+{
+    int server_socket = get_connected_socket(server_addr, addr_size);
+    if (server_socket < 0) 
+    {
+        if (server_socket == ERR_GETADDRINFO) {
+            err_quit_msg("getaddrinfo error: %s", gai_strerror(server_socket));
+        }
+        else if (server_socket == ERR_CONNECT){
+            err_sys("connection call failed (errno: %d)", errno);
+        }
+        else 
+            err_sys("error on connection try (err num: %d)", server_socket);
+    }
+
+    info_msg("connection successful\n\n");
+    return server_socket;
+}
+
+static void sig_winch_handle(int _) { tty_resized = 1; }
+
 void set_signals(void)
 {
     struct sigaction sa;
-    sa.sa_handler = send_winsize_info;
+    sa.sa_handler = sig_winch_handle;
     sa.sa_flags   = SA_RESTART; // restart interupted syscalls
     sigemptyset(&sa.sa_mask);   // no need to turn off signals
 

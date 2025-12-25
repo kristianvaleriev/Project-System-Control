@@ -102,6 +102,8 @@ char* get_host_addr(struct sockaddr* addr, struct addrinfo* hint)
         }
         else if (saddr->sa_family == hint->ai_family)
             ret_addr = malloc(hint->ai_addrlen);
+        else 
+            continue;
 
         if (inet_ntop(saddr->sa_family, 
                       convert_addr(saddr),

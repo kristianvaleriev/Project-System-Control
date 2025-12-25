@@ -1,3 +1,4 @@
+#include <asm-generic/ioctls.h>
 #ifndef WITHOUT_NCURSES
 
 #include "../../include/includes.h"
@@ -6,6 +7,7 @@
 #include <sys/wait.h>
 #include <ncurses.h>
 #include <pthread.h>
+#include <assert.h>
 #include <signal.h>
 #include <unistd.h>
 #include <vterm.h>
@@ -25,32 +27,79 @@ pthread_cond_t  setup_cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t setup_lock = PTHREAD_MUTEX_INITIALIZER;
 */ 
 
-static WINDOW* pane;
+static WINDOW* main_win;
+static WINDOW* main_pane;
 
-struct win_array {
-    WINDOW** array;
-    size_t count;
-    size_t alloced;
-} windows;
+enum WIN_TYPES {
+    BASIC, FRAME, PANE,
+};
+
+typedef struct {
+    WINDOW* frame;
+    chtype border_chs[8];
+} win_pane_t;
+
+struct window_nodes {
+    WINDOW* win;
+    
+    int type;
+    void* data;
+}* win_array;
+
+static size_t win_arr_count;
+static size_t win_arr_alloced;
 
 static void init_win_array(int n)
 {
-    windows.array = calloc(n, sizeof(WINDOW*));
-    windows.count = 0;
-    windows.alloced = n;
+    win_array = calloc(n, sizeof(*win_array));
+    for (int i = 0; i < n; i++) 
+    {
+        win_array[i].win  = NULL;
+        win_array[i].data = NULL;
+        win_array[i].type = BASIC;
+    }
+
+    win_arr_count = 0;
+    win_arr_alloced = n;
 }
 
-static void insert_into_windows(WINDOW* win)
+static size_t insert_into_windows(WINDOW* win, int type, void* data)
 {
-    size_t idx = windows.count++;
-    if (idx < windows.alloced)
-        windows.array[idx] = win;
+    size_t idx = win_arr_count++;
+
+    if (idx >= win_arr_alloced) {
+        win_array = realloc(win_array, win_arr_alloced + 2);
+        if (!win_array) 
+            err_sys("realloc failed!");
+        
+        win_arr_alloced += 2;
+    }
+
+    win_array[idx].win = win;
+    win_array[idx].type = type;
+    if (type)
+        win_array[idx].data = data;
+    else 
+        win_array[idx].data = NULL;
+
+    return idx;
 }
+#define insert_into_windows_def(win) \
+        insert_into_windows(win, 0, NULL)
 
 static void refresh_windows(void)
 {
-    for (size_t i = 0; i < windows.count; i++)
-        wrefresh(windows.array[i]);
+    for (size_t i = 0; i < win_arr_count; i++)
+        wrefresh(win_array[i].win);
+}
+
+static void clear_windows(void)
+{
+    for (size_t i = 0; i < win_arr_count; i++)
+    {
+        wclear(win_array[i].win);
+        wrefresh(win_array[i].win);
+    }
 }
 
 
@@ -63,24 +112,34 @@ void setup_ncurses(void)
     start_color();
     init_pair(1, COLOR_BLUE, COLOR_BLACK);
 
-    scrollok(stdscr, TRUE);
+    //scrollok(stdscr, TRUE);
 
     atexit((void(*)(void)) endwin);
    
-    /*
-    if (//dup2(slave_fd, STDIN_FILENO)  < 0 ||
-        dup2(pipe_fds[1], STDOUT_FILENO) < 0 ||
-        dup2(err_fd,   STDERR_FILENO) < 0)
-        err_sys("dup2 failed in ncurses setup");
-    */
+    insert_into_windows_def(stdscr);
 
-    //close(slave_fd);
-    //close(pipe_fds[1]);
-
-    //stdout_fd = pipe_fds[0];
+    main_win = newwin(LINES, COLS, 0, 0);
+    insert_into_windows_def(main_win);
+    scrollok(main_win, TRUE);
 }
 
-void make_panel(WINDOW** frame, WINDOW** pane,
+void display_panel_border(struct window_nodes* winn)
+{
+    if (winn->type != PANE)
+        return;
+
+    assert(winn->win  != NULL);
+    assert(winn->data != NULL);
+
+    win_pane_t* pane_data = (win_pane_t* ) winn->data;
+    chtype* border_chs = pane_data->border_chs;
+
+    wborder(winn->win, border_chs[0], border_chs[1], 
+            border_chs[2], border_chs[3], border_chs[4], 
+            border_chs[5], border_chs[6], border_chs[7]);
+}
+
+void make_panel(WINDOW** frame, WINDOW** pane, chtype border[8],
                 int rows, int cols, int starty, int startx)
 {
     *frame = newwin(rows, cols, starty, startx);
@@ -90,42 +149,92 @@ void make_panel(WINDOW** frame, WINDOW** pane,
         err_cont(0, "window creating failed");
 
     scrollok(*pane, TRUE);
+
+    int maxy, maxx;
+    if (main_win) {
+        getmaxyx(main_win, maxy, maxx);
+        wresize(main_win, maxy - rows, maxx);
+    }
+    else {
+        getmaxyx(stdscr, maxy, maxx);
+        wresize(stdscr, maxy - rows, maxx);
+    }
+
+    win_pane_t* new_pane = malloc(sizeof *new_pane);
+    new_pane->frame = *frame;
+    memcpy(new_pane->border_chs, border, 8);
+
+    size_t idx;
+    insert_into_windows(*frame, FRAME, &win_array[win_arr_count]);
+    idx = insert_into_windows(*pane, PANE, new_pane);
+
+    display_panel_border(&win_array[idx]);
 }
 
 
-static int stdin_fd;
-static int stdout_fd;
-static int child_pid;
+static volatile sig_atomic_t ncurse_resize = 0;
+static void (*client_winch_handle)(int);
 
-static void ncurse_loop(void);
-static void sig_child_exit(int _) 
-{ 
-    int status;
-    if (waitpid(child_pid, &status, WNOHANG))
-        if (WIFEXITED(status))
-            exit(0);
-}
-
-void* setup_client_ncurses(void* _)
+static void sig_winch_handle(int signo)
 {
-    int input_pipe[2]; pipe(input_pipe);
+    ncurse_resize = 1;
+    if (client_winch_handle)
+        client_winch_handle(signo);
+}
+
+static volatile int child_pid;
+static void (*client_child_handle)(int);
+
+static void sig_child_exit(int signo) 
+{ 
+    if (client_child_handle)
+        client_child_handle(signo);
+    if (waitpid(child_pid, NULL, WNOHANG))
+        exit(0);
+}
+
+void setup_ncurse_signal_handling(void) 
+{
+    struct sigaction sa, old;
+    sa.sa_handler = sig_winch_handle;
+    sa.sa_flags   = SA_RESTART; // restart interupted syscalls
+    sigemptyset(&sa.sa_mask);   // no need to turn off signals
+
+    if (sigaction(SIGWINCH, &sa, &old) < 0)
+        err_sys("sigaction failed in setup signal handling");
+    client_winch_handle = old.sa_handler;
+
+    sa.sa_handler = sig_child_exit;
+    old.sa_handler = NULL; // just in case.
+    if (sigaction(SIGCHLD, &sa, &old) < 0)
+        err_sys("sigaction failed in setup signal handling");
+    client_child_handle = old.sa_handler;
+}
+
+
+static int stdout_fd;
+static void ncurse_loop(void);
+
+pid_t handle_ncurses_and_fork(void)
+{
     int saved_stdin = dup(STDOUT_FILENO);
+
+    int err_fd = open(LOG_NAME, O_RDWR | O_CREAT | O_TRUNC, 0755);
+    if (err_fd < 0) 
+        err_info("could not create err.log! Sorry...");
 
     child_pid = forkpty(&stdout_fd, NULL, NULL, NULL);
     if (child_pid < 0)
         err_sys("forkpty");
 
-
-    if (!child_pid) {
-        close(input_pipe[1]);
-
-        int err_fd = open(LOG_NAME, O_RDWR | O_CREAT | O_TRUNC, 0755);
-        if (err_fd < 0)
-            err_info("could not create err.log! Sorry...");
-
-        dup2(saved_stdin, STDIN_FILENO);
+    if (err_fd >= 0) {
         dup2(err_fd, STDERR_FILENO);
         close(err_fd);
+    }
+
+    if (!child_pid) {
+        dup2(saved_stdin, STDIN_FILENO);
+        close(saved_stdin); 
 
         sigset_t sigset, oldmask;
         sigemptyset(&sigset);
@@ -138,34 +247,35 @@ void* setup_client_ncurses(void* _)
 
         sigprocmask(SIG_SETMASK, &oldmask, NULL);
 
-        return 0;
+        return getppid();
     }
+    close(saved_stdin);
+   
+    return 0;
+}
 
-    close(input_pipe[0]);
-    stdin_fd = input_pipe[1];
-    if (signal(SIGCHLD, sig_child_exit) < 0)
-        err_sys("signal in setup client ncurses");
-
+void* setup_client_ncurses(void* _)
+{
     //pthread_mutex_lock(&setup_lock);
+    init_win_array(5);
 
     setup_ncurses();
     setup_vterm();
-    init_win_array(5);
+    setup_ncurse_signal_handling();
 
     //is_setup_done = 1;
 
     //pthread_mutex_unlock(&setup_lock);
     //pthread_cond_signal(&setup_cond);
 
+    chtype border_chs[8]; 
+    memset(border_chs, ' ', 8);
+    border_chs[2] = 0;
+
     size_t n_rows = LINES * 0.25;
     WINDOW* frame;
-    make_panel(&frame, &pane, n_rows, COLS, LINES - n_rows, 0);
 
-    wborder(frame, ' ', ' ', 0, ' ', ' ', ' ', ' ', ' ');
-
-    insert_into_windows(stdscr);
-    insert_into_windows(frame);
-    insert_into_windows(pane);
+    make_panel(&frame, &main_pane, border_chs, n_rows, COLS, LINES - n_rows, 0);
     refresh_windows();
 
     kill(child_pid, SIGUSR2);
@@ -174,6 +284,8 @@ void* setup_client_ncurses(void* _)
 
     return 0;
 }
+
+static void handle_ncurses_resize(void);
 
 static void ncurse_loop(void)
 {
@@ -184,39 +296,51 @@ static void ncurse_loop(void)
     set_nonblocking(stderr_fd);
     set_nonblocking(stdout_fd);
 
-    struct pollfd pfds[] = {
-        {
-            .fd = stdout_fd,
-            .events = POLLIN,
-        },
-    };
-
     while (1) 
-    {
-        while ((rc = poll(pfds, sizeof pfds / sizeof *pfds, 0)) <= 0) {
-            if (rc < 0)
-                err_sys("poll at server loop failed");
-
-            while ((rc = read(stderr_fd, buf, sizeof buf)) > 0) {
-                wattron(pane, A_BOLD);
-                waddnstr(pane, buf, rc);
-                wattroff(pane, A_BOLD);
-
-                refresh_windows();
-            }
+    { 
+        if (ncurse_resize) {
+            ncurse_resize = 0;
+            handle_ncurses_resize();
         }
 
-        if (pfds[0].revents & POLLIN) {
-            if ((rc = read(stdout_fd, buf, sizeof buf)) > 0) 
-                vterm_write_to_input(buf, rc);
+        while ((rc = read(stderr_fd, buf, sizeof buf)) > 0) {
+            wattron(main_pane, A_BOLD);
+            waddnstr(main_pane, buf, rc);
+            wattroff(main_pane, A_BOLD);
 
+            refresh_windows();
+        }
+
+        while ((rc = read(stdout_fd, buf, sizeof buf)) > 0) {
+            vterm_write_to_input(buf, rc);
             //vterm_screen_flush_damage(vts);
-            render_vterm_diff();
+            render_vterm_diff(main_win);
         }
+    }
+}
 
-        //char ch;
-        //read(STDIN_FILENO, &ch, 1 );
-        //write(stdin_fd, &ch, 1);
+void handle_ncurses_resize(void)
+{
+    endwin();
+    clear_windows();
+
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+
+    extern VTerm* vt;
+    vterm_set_size(vt, rows, cols);
+
+    struct winsize ws = { 0 };
+    ws.ws_row = rows;
+    ws.ws_col = cols;
+
+    ioctl(stdout_fd, TIOCSWINSZ, &ws);
+
+    clear_windows();
+    for (int i = 0; i < win_arr_count; i++) 
+    {
+        if (win_array[i].type == PANE)
+            display_panel_border(&win_array[i]);
     }
 }
 
