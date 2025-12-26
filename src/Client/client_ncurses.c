@@ -1,4 +1,3 @@
-#include <asm-generic/ioctls.h>
 #ifndef WITHOUT_NCURSES
 
 #include "../../include/includes.h"
@@ -51,7 +50,7 @@ static size_t win_arr_alloced;
 
 static void init_win_array(int n)
 {
-    win_array = calloc(n, sizeof(*win_array));
+    win_array = calloc(n, sizeof *win_array);
     for (int i = 0; i < n; i++) 
     {
         win_array[i].win  = NULL;
@@ -67,20 +66,17 @@ static size_t insert_into_windows(WINDOW* win, int type, void* data)
 {
     size_t idx = win_arr_count++;
 
-    if (idx >= win_arr_alloced) {
-        win_array = realloc(win_array, win_arr_alloced + 2);
+    if (win_arr_count >= win_arr_alloced) {
+        win_arr_alloced += 2;
+        win_array = realloc(win_array, win_arr_alloced * sizeof *win_array);
+
         if (!win_array) 
             err_sys("realloc failed!");
-        
-        win_arr_alloced += 2;
     }
 
     win_array[idx].win = win;
     win_array[idx].type = type;
-    if (type)
-        win_array[idx].data = data;
-    else 
-        win_array[idx].data = NULL;
+    win_array[idx].data = data;
 
     return idx;
 }
@@ -89,8 +85,11 @@ static size_t insert_into_windows(WINDOW* win, int type, void* data)
 
 static void refresh_windows(void)
 {
-    for (size_t i = 0; i < win_arr_count; i++)
+    for (size_t i = 0; i < win_arr_count; i++) {
+        if (win_array[i].type == PANE)
+            touchwin(((win_pane_t*) win_array[i].data)->frame);
         wrefresh(win_array[i].win);
+    }
 }
 
 static void clear_windows(void)
@@ -98,8 +97,8 @@ static void clear_windows(void)
     for (size_t i = 0; i < win_arr_count; i++)
     {
         wclear(win_array[i].win);
-        wrefresh(win_array[i].win);
     }
+    refresh_windows();
 }
 
 
@@ -131,22 +130,26 @@ void display_panel_border(struct window_nodes* winn)
     assert(winn->win  != NULL);
     assert(winn->data != NULL);
 
-    win_pane_t* pane_data = (win_pane_t* ) winn->data;
+    win_pane_t* pane_data = winn->data;
     chtype* border_chs = pane_data->border_chs;
 
-    wborder(winn->win, border_chs[0], border_chs[1], 
+    wborder(pane_data->frame, border_chs[0], border_chs[1], 
             border_chs[2], border_chs[3], border_chs[4], 
             border_chs[5], border_chs[6], border_chs[7]);
 }
 
-void make_panel(WINDOW** frame, WINDOW** pane, chtype border[8],
+int begin_row = 1, begin_col = 1;
+
+void make_panel(WINDOW** frame, WINDOW** pane, chtype* border,
                 int rows, int cols, int starty, int startx)
 {
     *frame = newwin(rows, cols, starty, startx);
-    *pane  = derwin(*frame, rows - 1, cols - 1, 1, 1);
+    *pane  = derwin(*frame, rows - 1, cols - 1, begin_row, begin_col);
 
-    if (!*frame || !*pane) 
+    if (!*frame || !*pane) {
         err_cont(0, "window creating failed");
+        return;
+    }
 
     scrollok(*pane, TRUE);
 
@@ -162,7 +165,7 @@ void make_panel(WINDOW** frame, WINDOW** pane, chtype border[8],
 
     win_pane_t* new_pane = malloc(sizeof *new_pane);
     new_pane->frame = *frame;
-    memcpy(new_pane->border_chs, border, 8);
+    memcpy(new_pane->border_chs, border, 8 * sizeof *border);
 
     size_t idx;
     insert_into_windows(*frame, FRAME, &win_array[win_arr_count]);
@@ -272,10 +275,12 @@ void* setup_client_ncurses(void* _)
     memset(border_chs, ' ', 8);
     border_chs[2] = 0;
 
-    size_t n_rows = LINES * 0.25;
-    WINDOW* frame;
+    int y,x;
+    getmaxyx(main_win, y, x);
+    size_t n_rows = y * 0.25;
 
-    make_panel(&frame, &main_pane, border_chs, n_rows, COLS, LINES - n_rows, 0);
+    WINDOW* frame;
+    make_panel(&frame, &main_pane, border_chs, n_rows, x, y - n_rows, 0);
     refresh_windows();
 
     kill(child_pid, SIGUSR2);
@@ -342,6 +347,7 @@ void handle_ncurses_resize(void)
         if (win_array[i].type == PANE)
             display_panel_border(&win_array[i]);
     }
+    refresh_windows();
 }
 
 #endif
