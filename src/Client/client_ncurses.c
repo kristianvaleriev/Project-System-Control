@@ -85,7 +85,8 @@ static size_t insert_into_windows(WINDOW* win, int type, void* data)
 
 static void refresh_windows(void)
 {
-    for (size_t i = 0; i < win_arr_count; i++) {
+    for (size_t i = 0; i < win_arr_count; i++) 
+    {
         if (win_array[i].type == PANE)
             touchwin(((win_pane_t*) win_array[i].data)->frame);
         wrefresh(win_array[i].win);
@@ -95,9 +96,7 @@ static void refresh_windows(void)
 static void clear_windows(void)
 {
     for (size_t i = 0; i < win_arr_count; i++)
-    {
         wclear(win_array[i].win);
-    }
     refresh_windows();
 }
 
@@ -109,7 +108,10 @@ void setup_ncurses(void)
     raw();
 
     start_color();
-    init_pair(1, COLOR_BLUE, COLOR_BLACK);
+    use_default_colors();
+
+    for (int color_pair = 0; color_pair <= 255; color_pair++)
+        init_pair(color_pair + 1, color_pair, -1);
 
     //scrollok(stdscr, TRUE);
 
@@ -119,6 +121,8 @@ void setup_ncurses(void)
 
     main_win = newwin(LINES, COLS, 0, 0);
     insert_into_windows_def(main_win);
+
+    wattrset(main_win, A_NORMAL);
     scrollok(main_win, TRUE);
 }
 
@@ -272,7 +276,7 @@ void* setup_client_ncurses(void* _)
     //pthread_cond_signal(&setup_cond);
 
     chtype border_chs[8]; 
-    memset(border_chs, ' ', 8);
+    memset(border_chs, ' ', 8 * sizeof *border_chs);
     border_chs[2] = 0;
 
     int y,x;
