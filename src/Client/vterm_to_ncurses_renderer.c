@@ -9,16 +9,6 @@
 VTerm* vt;
 VTermScreen* vts;
 
-// Represents one cell in our snapshot
-typedef struct {
-    char ch;
-    short fg;
-} Cell;
-
-// A global snapshot pointer:
-static Cell *prev_screen = NULL;
-
-// Size of last snapshot
 static int prev_rows = 0;
 static int prev_cols = 0;
 
@@ -27,7 +17,7 @@ static short vterm_color_to_ncurses(const VTermColor *c);
 static short get_pair(short fg, short bg);
 static void apply_attrs(VTermScreenCell *cell);
 
-#define MAX_PAIRS 1024
+#define MAX_PAIRS 255
 typedef struct {
     short fg;
     short bg;
@@ -46,62 +36,75 @@ void render_vterm_diff(WINDOW* display)
     int rows, cols;
     getmaxyx(display, rows, cols);
 
-    // Reallocate snapshot if size has changed
-    if (!prev_screen || rows != prev_rows || cols != prev_cols) {
-        free(prev_screen);
+    //leaveok(display, TRUE);
+    //werase(display);
+
+    if (rows != prev_rows || cols != prev_cols) {
         prev_rows = rows;
         prev_cols = cols;
-        prev_screen = calloc(rows * cols, sizeof(Cell));
 
         vterm_set_size(vt, rows, cols);
     }
 
-    // Temporary local buffer before applying updates
-    VTermScreenCell cell;
+    VTermPos vpos;
+    VTermState* vstate = vterm_obtain_state(vt);
+    vterm_state_get_cursorpos(vstate, &vpos);
+
+    VTermScreenCell cell = {0};
 
     for (int r = 0; r < rows; r++) 
     {
         for (int c = 0; c < cols; c++) 
         {
+            if (r == vpos.row && c == vpos.col)
+                continue;
+
             if (!vterm_screen_get_cell(vts, (VTermPos){r, c}, &cell))
                 continue;
 
-            char  ch = cell.chars[0] ? cell.chars[0] : ' ';
-            short fg = cell.fg.indexed.idx;
+            chtype ch = cell.chars[0] ? cell.chars[0] : ' ';
 
-            // Get snapshot index
-            int idx = r * cols + c;
+            short fg = vterm_color_to_ncurses(&cell.fg);
+            short bg = vterm_color_to_ncurses(&cell.bg);
 
-            // Test if this cell changed
-            if (prev_screen[idx].ch != ch ||
-                prev_screen[idx].fg != fg) {
+            attr_t attrs = A_NORMAL;
 
-                prev_screen[idx].ch = ch;
-                prev_screen[idx].fg = fg;
+            if (cell.attrs.bold)      
+                attrs |= A_BOLD;
 
-                wattrset(display, A_NORMAL);
+            if (cell.attrs.underline)
+                attrs |= A_UNDERLINE;
 
-                short fg = vterm_color_to_ncurses(&cell.fg);
-                short bg = vterm_color_to_ncurses(&cell.bg);
+            if (cell.attrs.reverse) 
+                attrs |= A_REVERSE;
+            attron(attrs);
 
-                short pair = get_pair(fg, bg);
-                if (pair > 0)
-                    wattron(display, COLOR_PAIR(pair));
+            short pair = get_pair(fg, bg);
+            if (pair > 0)
+                wattron(display, COLOR_PAIR(pair));
 
-                apply_attrs(&cell);
-                mvwaddch(display, r, c, ch);
+            mvwaddch(display, r, c, ch);
 
-                if (pair > 0)
-                    wattroff(display, COLOR_PAIR(pair));
-            }
+            if (pair > 0)
+                wattroff(display, COLOR_PAIR(pair));
+
+            attroff(attrs);
         }
     }
+    //leaveok(display, FALSE);
 
-    VTermState* vstate = vterm_obtain_state(vt);
-    VTermPos vpos;
-    vterm_state_get_cursorpos(vstate, &vpos);
+    if (vpos.row >= rows) vpos.row = rows - 1;
+    if (vpos.col >= cols) vpos.col = cols - 1;
 
-    wmove(display, vpos.row, vpos.col);
+    //wmove(display, vpos.row, vpos.col);
+
+    vterm_screen_get_cell(vts, vpos, &cell);
+    chtype ch = cell.chars[0] ? cell.chars[0] : ' ';
+
+    wattron(display, A_REVERSE);
+    mvwaddch(display, vpos.row, vpos.col, ch);
+    wattroff(display, A_REVERSE);
+
     wrefresh(display);
 }
 
@@ -138,18 +141,7 @@ static short vterm_color_to_ncurses(const VTermColor *c)
 
 static void apply_attrs(VTermScreenCell *cell) 
 {
-    attr_t a = A_NORMAL;
-
-    if (cell->attrs.bold)      
-        a |= A_BOLD;
-
-    if (cell->attrs.underline)
-        a |= A_UNDERLINE;
-
-    if (cell->attrs.reverse) 
-        a |= A_REVERSE;
-
-    attron(a);
+    
 }
 
 static short get_pair(short fg, short bg)

@@ -17,7 +17,7 @@
 
 #include "client_ncurses.h"
 
-#define LOG_NAME "err.log"
+#define LOG_NAME "client.log"
 
 /*
 int is_setup_done = 0; // Probably not needed, but just in case.
@@ -38,7 +38,7 @@ typedef struct {
     chtype border_chs[8];
 } win_pane_t;
 
-struct window_nodes {
+struct window_node {
     WINDOW* win;
     
     int type;
@@ -106,6 +106,7 @@ void setup_ncurses(void)
     initscr();
     noecho();
     raw();
+    nodelay(stdscr, 1);
 
     start_color();
     use_default_colors();
@@ -124,9 +125,10 @@ void setup_ncurses(void)
 
     wattrset(main_win, A_NORMAL);
     scrollok(main_win, TRUE);
+    curs_set(0);
 }
 
-void display_panel_border(struct window_nodes* winn)
+void display_panel_border(struct window_node* winn)
 {
     if (winn->type != PANE)
         return;
@@ -310,9 +312,10 @@ static void ncurse_loop(void)
         if (ncurse_resize) {
             ncurse_resize = 0;
             handle_ncurses_resize();
+            lseek(stderr_fd, 0, SEEK_SET);
         }
 
-        while ((rc = read(stderr_fd, buf, sizeof buf)) > 0) {
+        if ((rc = read(stderr_fd, buf, sizeof buf)) > 0) {
             wattron(main_pane, A_BOLD);
             waddnstr(main_pane, buf, rc);
             wattroff(main_pane, A_BOLD);
@@ -322,7 +325,6 @@ static void ncurse_loop(void)
 
         while ((rc = read(stdout_fd, buf, sizeof buf)) > 0) {
             vterm_write_to_input(buf, rc);
-            //vterm_screen_flush_damage(vts);
             render_vterm_diff(main_win);
         }
     }
