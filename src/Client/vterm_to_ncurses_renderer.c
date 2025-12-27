@@ -36,8 +36,7 @@ void render_vterm_diff(WINDOW* display)
     int rows, cols;
     getmaxyx(display, rows, cols);
 
-    //leaveok(display, TRUE);
-    //werase(display);
+    werase(display);
 
     if (rows != prev_rows || cols != prev_cols) {
         prev_rows = rows;
@@ -56,8 +55,8 @@ void render_vterm_diff(WINDOW* display)
     {
         for (int c = 0; c < cols; c++) 
         {
-            if (r == vpos.row && c == vpos.col)
-                continue;
+            //if (r == vpos.row && c == vpos.col)
+            //    continue;
 
             if (!vterm_screen_get_cell(vts, (VTermPos){r, c}, &cell))
                 continue;
@@ -96,14 +95,7 @@ void render_vterm_diff(WINDOW* display)
     if (vpos.row >= rows) vpos.row = rows - 1;
     if (vpos.col >= cols) vpos.col = cols - 1;
 
-    //wmove(display, vpos.row, vpos.col);
-
-    vterm_screen_get_cell(vts, vpos, &cell);
-    chtype ch = cell.chars[0] ? cell.chars[0] : ' ';
-
-    wattron(display, A_REVERSE);
-    mvwaddch(display, vpos.row, vpos.col, ch);
-    wattroff(display, A_REVERSE);
+    wmove(display, vpos.row, vpos.col);
 
     wrefresh(display);
 }

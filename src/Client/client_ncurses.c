@@ -124,8 +124,8 @@ void setup_ncurses(void)
     insert_into_windows_def(main_win);
 
     wattrset(main_win, A_NORMAL);
-    scrollok(main_win, TRUE);
-    curs_set(0);
+    //scrollok(main_win, TRUE);
+    //curs_set(0);
 }
 
 void display_panel_border(struct window_node* winn)
