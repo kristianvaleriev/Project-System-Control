@@ -103,13 +103,15 @@ static ssize_t recv_filename(int socket, char* filename, size_t size)
     return rc;
 }
 
-void handle_files(int socket, int term_fd, struct client_request* req)
+int handle_files(int socket, int term_fd, struct client_request* req)
 {
     char filename[MAX_FILENAME] = {0};
     if (recv_filename(socket, filename, MAX_FILENAME) <= 0) 
-        return;
+        return errno;
 
     create_file(socket, filename, req->data_size);
+
+    return 0;
 }
 
 
@@ -118,11 +120,11 @@ static void   restore_working_dir(void);
 static pid_t    compile_driver(char* driver_name, char* cwd);
 static void   install_driver(char* driver_name, size_t len);
 
-void handle_drivers(int socket, int term_fd, struct client_request* req)
+int handle_drivers(int socket, int term_fd, struct client_request* req)
 {
     char filename[MAX_FILENAME] = {0};
     if (recv_filename(socket, filename, MAX_FILENAME) <= 0)
-        return;
+        return errno;
 
     size_t len;
     char* ptr = strrchr(filename, '/');
@@ -136,8 +138,8 @@ void handle_drivers(int socket, int term_fd, struct client_request* req)
     char* cwd = set_working_dir(filename);
 
     if (create_file(socket, filename, req->data_size) < 0) {
-        info_msg("driver creation failed");
-        return;
+        info_msg("driver file creation failed");
+        return 0;
     }
 
     pid_t pid = compile_driver(filename, cwd);
@@ -146,14 +148,18 @@ void handle_drivers(int socket, int term_fd, struct client_request* req)
     while ((status = waitpid(pid, NULL, WNOHANG)) == 0) 
         ;
 
-    if (status < 0)   
+    if (status < 0) {  
         err_sys("waitpid failed");
+        return errno;
+    }
 
     install_driver(filename, len);
 
     free(cwd);
 
     restore_working_dir();
+
+    return 0;
 }
 
 extern char* program_storage;

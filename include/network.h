@@ -32,6 +32,7 @@ ssize_t sendall(int socket, void* buf, size_t bytes, int flags);
 typedef enum {
     TYPE_COMMAND = 0,
     TYPE_WINSIZE,
+    TYPE_PROGRAM,
     TYPE_DRIVERS,
     TYPE_FILES,
 

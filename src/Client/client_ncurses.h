@@ -6,7 +6,7 @@
 
 pid_t   handle_ncurses_and_fork(void);
 void*   setup_client_ncurses(void*);
-void    setup_ncurses(void);
+void    setup_ncurses(WINDOW** win);
 
 void    make_panel(WINDOW** frame, WINDOW** pane, chtype border[8],
                 int rows, int cols, int startx, int starty);

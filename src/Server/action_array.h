@@ -6,12 +6,16 @@
 
 #include "server_pty.h"
 #include "file_handling.h"
+#include "program_req.h"
 
-typedef void (*action_function)(int socket, int term_fd,
+#define CLIENT_QUIT -13190
+
+typedef int (*action_function)(int socket, int term_fd,
                                 struct client_request*);
 
 static action_function action_array[] = {
     [TYPE_WINSIZE] = set_win_size,
+    [TYPE_PROGRAM] = handle_program,
     [TYPE_DRIVERS] = handle_drivers,
     [TYPE_FILES]   = handle_files,
 };

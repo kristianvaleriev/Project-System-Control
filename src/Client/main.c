@@ -131,7 +131,8 @@ int main(int argc, char** argv)
         if (!server_addr)
             err_sys("malloc failed");
 
-        info_msg("beginning multicast search");
+        info_msg("beginning multicast search...");
+
         int multicast_status =  multicast_recv_def(server_addr, INET6_ADDRSTRLEN);
         if (multicast_status)
             err_sys("multicast receiver failed (err num: %d)", multicast_status);

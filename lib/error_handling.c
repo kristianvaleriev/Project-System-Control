@@ -30,6 +30,8 @@ void init_syslog(char* name, int option, int facility)
 
 static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
 {
+    int err_copy = errno;
+
     char buf[MAXLINE];
     size_t len = 0;
 
@@ -50,6 +52,8 @@ static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
     }
     else 
         syslog(priority, "%s", buf);
+
+    errno = err_copy;
 }
 
 /*

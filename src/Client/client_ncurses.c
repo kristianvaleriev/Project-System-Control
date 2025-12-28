@@ -101,7 +101,7 @@ static void clear_windows(void)
 }
 
 
-void setup_ncurses(void)
+void setup_ncurses(WINDOW** std_win)
 {
     initscr();
     noecho();
@@ -114,18 +114,23 @@ void setup_ncurses(void)
     for (int color_pair = 0; color_pair <= 255; color_pair++)
         init_pair(color_pair + 1, color_pair, -1);
 
-    //scrollok(stdscr, TRUE);
+    curs_set(0);
 
     atexit((void(*)(void)) endwin);
    
     insert_into_windows_def(stdscr);
 
-    main_win = newwin(LINES, COLS, 0, 0);
-    insert_into_windows_def(main_win);
+    if (!std_win) return;
 
-    wattrset(main_win, A_NORMAL);
-    //scrollok(main_win, TRUE);
-    //curs_set(0);
+    WINDOW* win = newwin(LINES, COLS, 0, 0);
+    insert_into_windows_def(win);
+
+    wattrset(win, A_NORMAL);
+    idlok(win, FALSE);
+    scrollok(win, FALSE);
+    leaveok(win, TRUE);
+
+    *std_win = win;
 }
 
 void display_panel_border(struct window_node* winn)
@@ -268,7 +273,7 @@ void* setup_client_ncurses(void* _)
     //pthread_mutex_lock(&setup_lock);
     init_win_array(5);
 
-    setup_ncurses();
+    setup_ncurses(&main_win);
     setup_vterm();
     setup_ncurse_signal_handling();
 

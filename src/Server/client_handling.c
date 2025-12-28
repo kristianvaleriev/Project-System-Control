@@ -87,16 +87,18 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
         }
 
         if (pfds[0].revents & POLLIN) {
-            if (client_req_handle(client_socket, master_fd) > 1) {
+            if ((rc = client_req_handle(client_socket, master_fd)) == CLIENT_QUIT) {
                 info_msg("client has left.");
                 exit(0);
             }
+            if (rc)
+                err_exit(rc, "client request handler reported");
         }
         if (pfds[1].revents & POLLIN)             
             term_reading_function(master_fd, client_socket);
 
         if (pfds[0].revents & POLLHUP ||
-                 pfds[1].revents & POLLHUP) {
+            pfds[1].revents & POLLHUP) {
             info_msg("client has left. (poll revent is HUP)");
             exit(0);
         }
@@ -187,9 +189,9 @@ static int client_req_handle(int client_socket, int master_fd)
 
     if ((rc = recv(client_socket, &req, sizeof req, 0)) <= 0)  {
         if (!rc)
-            return 1;
-        err_info("recv of client_req failed");
-        return -1;
+            return CLIENT_QUIT;
+        info_msg("recv of client_req failed");
+        return errno;
     }
 
     if (req.type) 
@@ -200,23 +202,24 @@ static int client_req_handle(int client_socket, int master_fd)
         if (!(req.type > 0 && req.type < TYPE_COUNT)) {
             err_cont(0, "detecting not defined reqeust type! "
                      "\"Are you certain whatever you're doing is worth it?\"");
-            return -1;
+            return 0;
         }
 
-        action_array[req.type](client_socket, master_fd, &req);
+        return action_array[req.type](client_socket, master_fd, &req);
     }
 
     else { // just a bash cmd
         if ((rc = recv(client_socket, cmd_buf, sizeof cmd_buf, 0)) <= 0)  {
             if (!rc)
-                return 1;
-            err_info("recv of client cmd failed");
-            return -1;
+                return CLIENT_QUIT;
+
+            info_msg("recv of client cmd failed");
+            return errno;
         }
 
         size = 0;
         for (ssize_t i = 0; i < rc; i++) {
-            // somehow those weren't the same STUPID thing on rpi4
+            // somehow those weren't the same STUPID thing on rpi4. HOW?!
             if (cmd_buf[i] != 0 /*|| cmd_buf[i] == '\0'*/) 
                 cmd_buf[size++] = cmd_buf[i];
             else if (cmd_buf[i+1] == 0 && cmd_buf[i+7] == 0)
