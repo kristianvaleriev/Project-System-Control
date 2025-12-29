@@ -27,6 +27,7 @@ char* set_program_name(char const* argv);
 void  set_program_storage(const char* prefix);
 
 ssize_t accumulative_read(int fd, char* buf, size_t buf_size, int timeout, int tries);
+ssize_t writeall(int fd, void* buf, size_t n);
 char* make_directory(const char*, const char*, const char*);
 void set_nonblocking(int fd);
 

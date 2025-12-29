@@ -96,6 +96,22 @@ ssize_t accumulative_read(int fd, char* buf, size_t buf_size, int timeout, int t
     return ret;
 }
 
+ssize_t writeall(int fd, void* buf, size_t n)
+{
+    size_t bytes_left = n;
+    size_t rc, offset = 0;
+    while ((rc = write(fd, buf + offset, bytes_left)) > 0) 
+    {
+        bytes_left -= rc;
+        if (bytes_left <= 0)
+            break;
+
+        offset += rc;
+    }
+
+    return rc;
+}
+
 void set_nonblocking(int fd) 
 {
     int flags = fcntl(fd, F_GETFL, 0);

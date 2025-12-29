@@ -87,8 +87,8 @@ static void refresh_windows(void)
 {
     for (size_t i = 0; i < win_arr_count; i++) 
     {
-        if (win_array[i].type == PANE)
-            touchwin(((win_pane_t*) win_array[i].data)->frame);
+        //if (win_array[i].type == PANE)
+        //    touchwin(((win_pane_t*) win_array[i].data)->frame);
         wrefresh(win_array[i].win);
     }
 }
@@ -274,7 +274,6 @@ void* setup_client_ncurses(void* _)
     init_win_array(5);
 
     setup_ncurses(&main_win);
-    setup_vterm();
     setup_ncurse_signal_handling();
 
     //is_setup_done = 1;
@@ -308,6 +307,9 @@ static void ncurse_loop(void)
     char buf[1028];
     ssize_t rc;
 
+    void* out_vt = initialize_vterm(main_win);
+    void* err_vt = initialize_vterm(main_pane);
+
     int stderr_fd = open(LOG_NAME, O_RDONLY);
     set_nonblocking(stderr_fd);
     set_nonblocking(stdout_fd);
@@ -317,21 +319,19 @@ static void ncurse_loop(void)
         if (ncurse_resize) {
             ncurse_resize = 0;
             handle_ncurses_resize();
-            lseek(stderr_fd, 0, SEEK_SET);
         }
 
         if ((rc = read(stderr_fd, buf, sizeof buf)) > 0) {
-            wattron(main_pane, A_BOLD);
-            waddnstr(main_pane, buf, rc);
-            wattroff(main_pane, A_BOLD);
-
-            refresh_windows();
+            vterm_input_write(err_vt, buf, rc);
+            render_vterm_diff(err_vt, main_pane);
+            napms(80);
         }
 
         while ((rc = read(stdout_fd, buf, sizeof buf)) > 0) {
-            vterm_write_to_input(buf, rc);
-            render_vterm_diff(main_win);
+            vterm_input_write(out_vt, buf, rc);
+            render_vterm_diff(out_vt, main_win);
         }
+
     }
 }
 
@@ -343,8 +343,10 @@ void handle_ncurses_resize(void)
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
+    /*
     extern VTerm* vt;
     vterm_set_size(vt, rows, cols);
+    */
 
     struct winsize ws = { 0 };
     ws.ws_row = rows;

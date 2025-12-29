@@ -123,6 +123,7 @@ int fork_handle_file_send(int type, struct filename_array* arr)
     int socket = new_connected_server_socket();
 
     handle_file_send(socket, type, arr);
+    close(socket);
 
-    exit(0);
+    _exit(0);
 }

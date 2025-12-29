@@ -6,11 +6,6 @@
 #include <ncurses.h>
 #include <vterm.h>
 
-VTerm* vt;
-VTermScreen* vts;
-
-static int prev_rows = 0;
-static int prev_cols = 0;
 
 
 static short vterm_color_to_ncurses(const VTermColor *c);
@@ -27,16 +22,20 @@ static ColorPair pair_cache[MAX_PAIRS];
 static int pair_count = 1;  // pair 0 is reserved
 
 
+static int prev_rows = 0;
+static int prev_cols = 0;
 /*
  * Renders only changed cells from vterm to ncurses,
  * and positions the ncurses cursor to the vterm cursor.
  */
-void render_vterm_diff(WINDOW* display) 
+void render_vterm_diff(void* vt, WINDOW* display)
 {
     int rows, cols;
     getmaxyx(display, rows, cols);
 
     werase(display);
+
+    VTermScreen* vts = vterm_obtain_screen(vt);
 
     if (rows != prev_rows || cols != prev_cols) {
         prev_rows = rows;
@@ -156,6 +155,7 @@ static short get_pair(short fg, short bg)
     return pair_count++;
 }
 
+/*
 void render_vterm_to_ncurses(void)
 {
     int rows, cols;
@@ -181,32 +181,30 @@ void render_vterm_to_ncurses(void)
 
     refresh();
 }
-
-size_t vterm_write_to_input(char* bytes, size_t len) 
-{ 
-    return vterm_input_write(vt, bytes, len); 
-}
+*/
 
 static int damage_callback(VTermRect rect, void* user) {return 1;}
 static VTermScreenCallbacks screen_cb = {
     .damage = damage_callback,
 };
 
-void setup_vterm(void)
+void* initialize_vterm(WINDOW* win)
 {
     int rows, cols;
-    getmaxyx(stdscr, rows, cols);
+    getmaxyx(win, rows, cols);
 
-    vt = vterm_new(rows, cols);
+    VTerm* vt = vterm_new(rows, cols);
     if (!vt) 
         err_quit_msg(0, "vterm_new failed");
     
     vterm_set_utf8(vt, 1);
 
-    vts = vterm_obtain_screen(vt);
+    VTermScreen* vts = vterm_obtain_screen(vt);
     vterm_screen_set_callbacks(vts, NULL, NULL);
     vterm_screen_enable_altscreen(vts, 1);
     vterm_screen_reset(vts, 1);
+
+    return vt;
 }
 
 #endif

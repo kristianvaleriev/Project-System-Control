@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <sys/poll.h>
 #include <termios.h>
 #include <sys/wait.h>
 #include <errno.h>
@@ -23,10 +24,9 @@ static char* shell_argv[] = {
     NULL
 };
 
-static pid_t __shell_pid = -1;
+pid_t __shell_pid = -1;
 
 static void   set_signals(void);
-static pid_t  handle_child_exec(int* fd);
 static int    init_logging_shell(int fd);
 
 static void   main_client_req_loop(int client_socket, 
@@ -37,7 +37,7 @@ static int    client_req_handle(int,int);
 
 static void   exit_handler(int signo)
 {
-    if (waitpid(__shell_pid, NULL, WNOHANG)) 
+    if (__shell_pid != -1 && waitpid(__shell_pid, NULL, WNOHANG)) 
         _exit(0);
 }
 
@@ -46,7 +46,7 @@ void handle_client(int client_socket)
     set_signals();
 
     int master_fd;
-    __shell_pid = handle_child_exec(&master_fd);
+    __shell_pid = handle_child_exec(&master_fd, init_logging_shell);
 
     /*
     int rc_err;
@@ -91,15 +91,18 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
                 info_msg("client has left.");
                 exit(0);
             }
-            if (rc)
-                err_exit(rc, "client request handler reported");
+            else if (rc > 0)
+                err_exit(rc, "client request handler reported system error");
+            else if (rc < 0)
+                err_quit_msg("client request handler reported error id #%d", rc);
         }
         if (pfds[1].revents & POLLIN)             
             term_reading_function(master_fd, client_socket);
 
         if (pfds[0].revents & POLLHUP ||
             pfds[1].revents & POLLHUP) {
-            info_msg("client has left. (poll revent is HUP)");
+            info_msg("client has left. (poll%d revent is HUP)", 
+                     pfds[0].revents & POLLHUP ? 0 : 1);
             exit(0);
         }
         
@@ -109,7 +112,7 @@ static void main_client_req_loop(int client_socket, int master_fd, int pid)
     }
 }
 
-static pid_t handle_child_exec(int* fd)
+pid_t handle_child_exec(int* fd, int (*to_exec)(int))
 {
     int master_pty, slave_pty;
 
@@ -124,6 +127,8 @@ static pid_t handle_child_exec(int* fd)
     //Parent returns here ::
     if (child_pid) {
         close(slave_pty);
+        free(slave_name);
+
         *fd = master_pty;
 
         return child_pid;
@@ -133,7 +138,7 @@ static pid_t handle_child_exec(int* fd)
     set_control_terminal(slave_pty, slave_name);
 
     free(slave_name);
-    _exit(init_logging_shell(slave_pty));
+    _exit(to_exec(slave_pty));
 }
 
 static int init_logging_shell(int fd)
@@ -169,12 +174,12 @@ static void term_reading_function(int read_fd, int write_fd)
         }
         return;
     }
-    //buf[size] = '\0';
-    //info_msg("sending buf: %s", buf);
+//    buf[rc] = '\0';
+//    info_msg("sending buf: %s", buf);
 
     if (send(write_fd, buf, rc, MSG_NOSIGNAL) < 0) {
         if (errno == EPIPE)
-            info_msg("PIPE"); // <-- & |^|hate this signal. It costed me 3 hours
+            info_msg("PIPE"); // <-- & |^|; hate this signal. It costed me 3 hours
         else 
             err_info("reading function's write fail");
     }
@@ -236,7 +241,7 @@ static int client_req_handle(int client_socket, int master_fd)
 static void set_signals(void)
 {
     struct sigaction sig_chld;
-    sig_chld.sa_handler = exit_handler;
+    sig_chld.sa_handler = SIG_IGN;
     sig_chld.sa_flags = SA_RESTART;
     sigemptyset(&sig_chld.sa_mask);   
     

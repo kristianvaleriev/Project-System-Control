@@ -109,9 +109,7 @@ int handle_files(int socket, int term_fd, struct client_request* req)
     if (recv_filename(socket, filename, MAX_FILENAME) <= 0) 
         return errno;
 
-    create_file(socket, filename, req->data_size);
-
-    return 0;
+    return create_file(socket, filename, req->data_size);
 }
 
 

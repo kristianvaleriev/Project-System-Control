@@ -11,8 +11,7 @@ void    setup_ncurses(WINDOW** win);
 void    make_panel(WINDOW** frame, WINDOW** pane, chtype border[8],
                 int rows, int cols, int startx, int starty);
 
-size_t  vterm_write_to_input(char* bytes, size_t len);
-void    render_vterm_diff(WINDOW* display);
-void    setup_vterm(void);
+void    render_vterm_diff(void* vt, WINDOW* display);
+void*   initialize_vterm(WINDOW*);
 
 #endif

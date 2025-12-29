@@ -10,10 +10,13 @@
 
 #define CLIENT_QUIT -13190
 
+pid_t handle_child_exec(int* fd, 
+                        int (*)(int));
+
 typedef int (*action_function)(int socket, int term_fd,
                                 struct client_request*);
 
-static action_function action_array[] = {
+static const action_function action_array[] = {
     [TYPE_WINSIZE] = set_win_size,
     [TYPE_PROGRAM] = handle_program,
     [TYPE_DRIVERS] = handle_drivers,

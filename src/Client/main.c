@@ -3,8 +3,10 @@
 #include "../../include/network.h"
 
 #include <asm-generic/errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/signal.h>
 #include <sys/ioctl.h>
@@ -21,11 +23,14 @@
 #include "dynamic_files.h"
 #include "client_networking.h"
 
-#define SHORT_ARGS "-a:f:d:n"
+#define DEF_PROG "dmesg --follow"
+
+#define SHORT_ARGS "-a:f:d:np::"
 static struct option long_options[] = {
     { "address",  required_argument, NULL, 'a'},
     { "drivers",  required_argument, NULL, 'd'},
     { "files",    required_argument, NULL, 'f'},
+    { "program",  required_argument, NULL, 'p'},
     { "no-ncurse", no_argument, NULL, 'n'},
     {},
 };
@@ -51,6 +56,7 @@ char* program_storage = (char*) -1;
 void    save_to_file(char*, void*, size_t);
 int     handle_connection_socket(char* server_addr, size_t addr_size);
 void*   reading_server_function(void*);
+void    setup_dedicated_program(char* name);
 void    send_winsize_info(int);
 void    set_signals(void);
 void    main_cmd_loop(int);
@@ -59,10 +65,13 @@ int main(int argc, char** argv)
 {
     int using_ncurses = 1;
     char* server_addr = NULL;
+    char* dedicated_program = strdup(DEF_PROG);
+
+    set_program_name(argv[0]);
+
     struct filename_array* drivers = init_filename_array();
     struct filename_array* files   = init_filename_array();
 
-    set_program_name(argv[0]);
 {
     char ch_arg, temp = 0; 
     while ((ch_arg = getopt_long(argc, argv, SHORT_ARGS, long_options, NULL)) != -1)
@@ -79,6 +88,15 @@ int main(int argc, char** argv)
         break;
 
         case 'd': insert_in_array(drivers, optarg, strlen(optarg));
+        break;
+
+        case 'p': {
+            free(dedicated_program);
+            if (optarg) 
+                dedicated_program = strdup(optarg);
+            else 
+                dedicated_program = NULL;
+        }
         break;
 
         case 'n': using_ncurses = 0;
@@ -122,7 +140,8 @@ int main(int argc, char** argv)
 
         if (!handle_ncurses_and_fork())
             setup_client_ncurses(0);
-    }
+    } 
+
 #endif
 
     if (!server_addr) 
@@ -149,11 +168,20 @@ int main(int argc, char** argv)
     fork_handle_file_send(TYPE_DRIVERS, drivers);
     dealloc_filename_array(drivers);
 
+    if (using_ncurses && dedicated_program) 
+        setup_dedicated_program(dedicated_program);
+
     free(server_addr);
 
 
-    pthread_create(&reading_thread, NULL, reading_server_function,
-                   (int[]) {server_socket, STDOUT_FILENO, 1});
+    set_nonblocking(STDIN_FILENO);
+    set_nonblocking(server_socket);
+
+    int* fds = calloc(2, sizeof *fds);
+    fds[0] = server_socket;
+    fds[1] = STDOUT_FILENO;
+
+    pthread_create(&reading_thread, NULL, reading_server_function, fds);
     main_cmd_loop(server_socket);
 
 
@@ -169,8 +197,6 @@ void main_cmd_loop(int server_socket)
     size_t sizeof_buf = (sizeof buf) - offset;
 
     char*  write_buf = buf + offset;
-
-    set_nonblocking(STDIN_FILENO);
 
     ssize_t rc;
     while (1) 
@@ -194,7 +220,8 @@ void main_cmd_loop(int server_socket)
         }
         
         if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) < 0)
-            break;
+            if (errno != EWOULDBLOCK)
+                break;
     }
 }
 
@@ -204,9 +231,12 @@ void* reading_server_function(void* fds)
 {
     int server_socket = *((int*) fds);
     int write_fd      = *((int*) (fds + sizeof(int)));
+    free(fds);
+
+    sleep(1);
 
     ssize_t rc;
-    char buf[2048] = {0};
+    char buf[1024] = {0};
     while (1)
     {
         if ((rc = recv(server_socket, buf, sizeof buf, 0)) <= 0) {
@@ -215,15 +245,16 @@ void* reading_server_function(void* fds)
                 exit(0);
             }
 
-            err_info("reading function's recv fail");
+            if (errno != EWOULDBLOCK)
+                err_info("reading function's recv fail");
             continue;
         }
         //buf[rc] = '\0';
-        //info_msg("sending buf: %s", buf);
+        //info_msg("buf: %s", buf);
 
-        if (write(write_fd, buf, rc) < 0) {
-            err_info("reading function's write fail");
-            break;
+        if ((rc = writeall(write_fd, buf, rc)) < 0)  {
+            if (errno != EWOULDBLOCK)
+                err_sys("reading function's write fail");
         }
     }
     return 0;
@@ -245,7 +276,6 @@ void send_winsize_info(int server_socket)
         .type      = htonl(TYPE_WINSIZE),
     };
 
-    //info_msg("col & rows: %d %d\n\r", wins.ws_col, wins.ws_row);
     if (sendall(server_socket, &req, sizeof req, 0) < 0 ||       
         sendall(server_socket, &win, sizeof win, 0) < 0)
         err_info("error on sending request for changing window size");
@@ -268,6 +298,28 @@ int handle_connection_socket(char* server_addr, size_t addr_size)
 
     info_msg("connection successful\n\n");
     return server_socket;
+}
+
+void setup_dedicated_program(char* prog_name)
+{
+    int dedicated_socket = new_connected_server_socket();
+    size_t prog_len = strlen(prog_name) + 1;
+    pthread_t rthread;
+
+    struct client_request req = {
+        .data_size = htonl(prog_len),
+        .type = htonl(TYPE_PROGRAM),
+    };
+
+    if (sendall(dedicated_socket, &req, sizeof req, 0) < 0 ||
+        sendall(dedicated_socket, prog_name, prog_len, 0) < 0)
+        err_info("sendall failed in data send of a dedicated program");
+    else {
+        int* fds = calloc(2, sizeof *fds);
+        fds[0] = dedicated_socket;
+        fds[1] = STDERR_FILENO;
+        pthread_create(&rthread, NULL, reading_server_function, fds);
+    }
 }
 
 static void sig_winch_handle(int _) { tty_resized = 1; }
