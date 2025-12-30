@@ -17,7 +17,6 @@
 
 #include "client_ncurses.h"
 
-#define LOG_NAME "client.log"
 
 /*
 int is_setup_done = 0; // Probably not needed, but just in case.
@@ -28,10 +27,6 @@ pthread_mutex_t setup_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static WINDOW* main_win;
 static WINDOW* main_pane;
-
-enum WIN_TYPES {
-    BASIC, FRAME, PANE,
-};
 
 typedef struct {
     WINDOW* frame;
@@ -101,9 +96,10 @@ static void clear_windows(void)
 }
 
 
-void setup_ncurses(WINDOW** std_win)
+void init_ncurses(WINDOW** std_win)
 {
     initscr();
+    curs_set(0);
     noecho();
     raw();
     nodelay(stdscr, 1);
@@ -114,7 +110,6 @@ void setup_ncurses(WINDOW** std_win)
     for (int color_pair = 0; color_pair <= 255; color_pair++)
         init_pair(color_pair + 1, color_pair, -1);
 
-    curs_set(0);
 
     atexit((void(*)(void)) endwin);
    
@@ -161,8 +156,6 @@ void make_panel(WINDOW** frame, WINDOW** pane, chtype* border,
         err_cont(0, "window creating failed");
         return;
     }
-
-    scrollok(*pane, TRUE);
 
     int maxy, maxx;
     if (main_win) {
@@ -229,22 +222,13 @@ void setup_ncurse_signal_handling(void)
 static int stdout_fd;
 static void ncurse_loop(void);
 
-pid_t handle_ncurses_and_fork(void)
+pid_t handle_ncurses_and_fork(struct window_placement* interface)
 {
-    int saved_stdin = dup(STDOUT_FILENO);
-
-    int err_fd = open(LOG_NAME, O_RDWR | O_CREAT | O_TRUNC, 0755);
-    if (err_fd < 0) 
-        err_info("could not create err.log! Sorry...");
-
+    int saved_stdin = dup(STDIN_FILENO);
+    
     child_pid = forkpty(&stdout_fd, NULL, NULL, NULL);
     if (child_pid < 0)
         err_sys("forkpty");
-
-    if (err_fd >= 0) {
-        dup2(err_fd, STDERR_FILENO);
-        close(err_fd);
-    }
 
     if (!child_pid) {
         dup2(saved_stdin, STDIN_FILENO);
@@ -268,12 +252,12 @@ pid_t handle_ncurses_and_fork(void)
     return 0;
 }
 
-void* setup_client_ncurses(void* _)
+void* setup_client_ncurses(struct window_placement* interface)
 {
     //pthread_mutex_lock(&setup_lock);
     init_win_array(5);
 
-    setup_ncurses(&main_win);
+    init_ncurses(&main_win);
     setup_ncurse_signal_handling();
 
     //is_setup_done = 1;

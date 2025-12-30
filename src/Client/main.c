@@ -3,9 +3,11 @@
 #include "../../include/network.h"
 
 #include <asm-generic/errno.h>
+#include <bits/getopt_core.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/signal.h>
@@ -26,24 +28,26 @@
 #define DEF_PROG "dmesg --follow"
 
 #define SHORT_ARGS "-a:f:d:np::"
-static struct option long_options[] = {
+static const struct option long_options[] = {
     { "address",  required_argument, NULL, 'a'},
     { "drivers",  required_argument, NULL, 'd'},
     { "files",    required_argument, NULL, 'f'},
-    { "program",  required_argument, NULL, 'p'},
+    { "program",  optional_argument, NULL, 'p'},
     { "no-ncurse", no_argument, NULL, 'n'},
     {},
 };
 
 #ifndef WITHOUT_NCURSES
     #include "client_ncurses.h"
-
+    
+/*
     static pthread_t ncurses_thread;
 
     extern pthread_mutex_t setup_lock;
     extern pthread_cond_t setup_cond;
 
     extern int is_setup_done;
+*/
 #endif
 
 static pthread_t reading_thread;
@@ -92,10 +96,7 @@ int main(int argc, char** argv)
 
         case 'p': {
             free(dedicated_program);
-            if (optarg) 
-                dedicated_program = strdup(optarg);
-            else 
-                dedicated_program = NULL;
+            dedicated_program = NULL;
         }
         break;
 
@@ -103,12 +104,29 @@ int main(int argc, char** argv)
         break;
 
         case 1:
-            if (temp == 'f')
-                insert_in_array(files, optarg, strlen(optarg));
-            else if (temp == 'd')
-                insert_in_array(drivers, optarg, strlen(optarg));
-            else 
-                info_msg("unrecognized option's argument");
+            switch (temp) {
+            case 'f': insert_in_array(files, optarg, strlen(optarg));
+            break;
+
+            case 'd': insert_in_array(drivers, optarg, strlen(optarg));
+            break;
+
+            case 'p': 
+                if (dedicated_program) {
+                    dedicated_program = realloc(dedicated_program, strlen(optarg) + 
+                                                strlen(dedicated_program) + 2);
+                    strcat(dedicated_program, " ");
+                } 
+                else 
+                    dedicated_program = calloc(strlen(optarg) + 1, 1);
+
+                strcat(dedicated_program, optarg);
+            break;
+
+            default: info_msg("unrecognized option's argument");
+            break;
+            }
+            
         continue;
         }
 
@@ -138,8 +156,36 @@ int main(int argc, char** argv)
         pthread_mutex_unlock(&setup_lock);
         */
 
-        if (!handle_ncurses_and_fork())
-            setup_client_ncurses(0);
+        int err_fd = open(LOG_NAME, O_RDWR | O_CREAT | O_TRUNC, 0755);
+        if (err_fd >= 0) {
+            dup2(err_fd, STDERR_FILENO);
+            close(err_fd);
+        }
+        else 
+            err_info("could not create err.log! Sorry...");
+
+        struct window_placement interface[] = {
+            {
+                .fd = STDOUT_FILENO, 
+                .type = MAIN,
+                .coords = {0},
+                .border = {' '},
+            },
+            {
+                .fd = STDERR_FILENO,
+                .type = PANE,
+                .coords = {
+                    .rows = LINES * 0.25,
+                    .cols = COLS,
+                    .startx = 1,
+                    .starty = 1,
+                },
+                .border = {' ', ' ', 0, ' ', ' ', ' ', ' ', ' '},
+            }
+        };
+
+        if (!handle_ncurses_and_fork(interface))
+            setup_client_ncurses(interface);
     } 
 
 #endif
@@ -219,7 +265,7 @@ void main_cmd_loop(int server_socket)
             continue;
         }
         
-        if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) < 0)
+        if (send(server_socket, buf, rc + offset, MSG_NOSIGNAL) <= 0)
             if (errno != EWOULDBLOCK)
                 break;
     }
@@ -241,8 +287,7 @@ void* reading_server_function(void* fds)
     {
         if ((rc = recv(server_socket, buf, sizeof buf, 0)) <= 0) {
             if (!rc) {
-                info_msg("Server connection's off. Exiting...\n\r");
-                exit(0);
+                break;
             }
 
             if (errno != EWOULDBLOCK)

@@ -55,7 +55,7 @@ void render_vterm_diff(void* vt, WINDOW* display)
         for (int c = 0; c < cols; c++) 
         {
             if (!vterm_screen_get_cell(vts, (VTermPos){r, c}, &cell) ||
-                 cell.width == 0)
+                cell.width == 0)
                 continue;
 
             chtype ch = cell.chars[0] ? cell.chars[0] : ' ';

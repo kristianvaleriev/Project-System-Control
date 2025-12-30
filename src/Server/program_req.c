@@ -56,6 +56,8 @@ int handle_program(int socket, int master_fd, struct client_request* req)
     if (!rc)
         return errno;
 
+    info_msg("trying to start dedicated client program '%s'", client_program_name);
+
     kill(SIGINT, __shell_pid);
 
     int new_master_fd;
