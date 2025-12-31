@@ -222,17 +222,52 @@ void setup_ncurse_signal_handling(void)
 static int stdout_fd;
 static void ncurse_loop(void);
 
-pid_t handle_ncurses_and_fork(struct window_placement* interface)
+static int* saved_fds = NULL;
+
+static void save_fds(struct window_placement* interface, size_t count)
 {
-    int saved_stdin = dup(STDIN_FILENO);
+    size_t idx = 0;
+    saved_fds = calloc(count+1, sizeof *saved_fds);
+    saved_fds[idx++] = dup(STDIN_FILENO);
+
+    for_each_win(inter, interface, count) {
+        if (inter->type == MAIN)
+            continue;
+        saved_fds[idx++] = dup(inter->fd);
+    }
+}    
+
+static void restore_fds(struct window_placement* interface, size_t count)
+{
+    size_t idx = 0;
+    if (dup2(saved_fds[idx], STDIN_FILENO) < 0)
+        err_sys("dup2 failed when restoring STDIN");
+
+    close(saved_fds[idx++]);
+
+    for_each_win(var, interface, count) {
+        if(var->type == MAIN)
+            continue;
     
+        if (dup2(saved_fds[idx], var->fd) < 0)
+            err_sys("dup2 failed when restoring fds");
+
+        close(saved_fds[idx++]);
+    }
+
+    free(saved_fds);
+}
+
+pid_t handle_ncurses_and_fork(struct window_placement* interface, size_t count)
+{
+    save_fds(interface, count);
+
     child_pid = forkpty(&stdout_fd, NULL, NULL, NULL);
     if (child_pid < 0)
         err_sys("forkpty");
 
     if (!child_pid) {
-        dup2(saved_stdin, STDIN_FILENO);
-        close(saved_stdin); 
+        restore_fds(interface, count);
 
         sigset_t sigset, oldmask;
         sigemptyset(&sigset);
@@ -247,12 +282,11 @@ pid_t handle_ncurses_and_fork(struct window_placement* interface)
 
         return getppid();
     }
-    close(saved_stdin);
    
     return 0;
 }
 
-void* setup_client_ncurses(struct window_placement* interface)
+void* setup_client_ncurses(struct window_placement* interface, size_t count)
 {
     //pthread_mutex_lock(&setup_lock);
     init_win_array(5);

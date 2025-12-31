@@ -161,14 +161,12 @@ int main(int argc, char** argv)
             dup2(err_fd, STDERR_FILENO);
             close(err_fd);
         }
-        else 
-            err_info("could not create err.log! Sorry...");
+        else err_info("could not create err.log! Sorry...");
 
         struct window_placement interface[] = {
             {
                 .fd = STDOUT_FILENO, 
                 .type = MAIN,
-                .coords = {0},
                 .border = {' '},
             },
             {
@@ -181,11 +179,13 @@ int main(int argc, char** argv)
                     .starty = 1,
                 },
                 .border = {' ', ' ', 0, ' ', ' ', ' ', ' ', ' '},
-            }
+            },
+            {}
         };
 
-        if (!handle_ncurses_and_fork(interface))
-            setup_client_ncurses(interface);
+        size_t count = sizeof interface / sizeof *interface;
+        if (!handle_ncurses_and_fork(interface, count))
+            setup_client_ncurses(interface, count);
     } 
 
 #endif

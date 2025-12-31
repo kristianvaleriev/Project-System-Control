@@ -28,8 +28,11 @@ struct window_placement {
     chtype border[8];
 };
 
-pid_t   handle_ncurses_and_fork(struct window_placement*);
-void*   setup_client_ncurses(struct window_placement*);
+#define for_each_win(var, arg, count) \
+    for (struct window_placement* var = arg; var - arg < count; var++)
+
+pid_t   handle_ncurses_and_fork(struct window_placement*, size_t);
+void*   setup_client_ncurses(struct window_placement*, size_t);
 void    init_ncurses(WINDOW** win);
 
 void    make_panel(WINDOW** frame, WINDOW** pane, chtype border[8],
