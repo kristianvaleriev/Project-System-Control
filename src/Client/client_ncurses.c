@@ -82,8 +82,8 @@ static void refresh_windows(void)
 {
     for (size_t i = 0; i < win_arr_count; i++) 
     {
-        //if (win_array[i].type == PANE)
-        //    touchwin(((win_pane_t*) win_array[i].data)->frame);
+        if (win_array[i].type == PANE)
+            touchwin(((win_pane_t*) win_array[i].data)->frame);
         wrefresh(win_array[i].win);
     }
 }

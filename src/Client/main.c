@@ -48,9 +48,13 @@ static const struct option long_options[] = {
 
     extern int is_setup_done;
 */
+
 #endif
 
 static pthread_t reading_thread;
+static pthread_mutex_t reading_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
+static unsigned short  thread_count;
+
 volatile sig_atomic_t tty_resized = 1;
 
 char* program_name = 0;
@@ -279,6 +283,10 @@ void* reading_server_function(void* fds)
     int write_fd      = *((int*) (fds + sizeof(int)));
     free(fds);
 
+    pthread_mutex_lock(&reading_thread_mutex);
+    thread_count++;
+    pthread_mutex_unlock(&reading_thread_mutex);
+
     sleep(1);
 
     ssize_t rc;
@@ -286,9 +294,8 @@ void* reading_server_function(void* fds)
     while (1)
     {
         if ((rc = recv(server_socket, buf, sizeof buf, 0)) <= 0) {
-            if (!rc) {
+            if (!rc) 
                 break;
-            }
 
             if (errno != EWOULDBLOCK)
                 err_info("reading function's recv fail");
@@ -302,6 +309,11 @@ void* reading_server_function(void* fds)
                 err_sys("reading function's write fail");
         }
     }
+
+    pthread_mutex_lock(&reading_thread_mutex);
+    thread_count--;
+    pthread_mutex_unlock(&reading_thread_mutex);
+
     return 0;
 }
 
@@ -350,6 +362,8 @@ void setup_dedicated_program(char* prog_name)
     int dedicated_socket = new_connected_server_socket();
     size_t prog_len = strlen(prog_name) + 1;
     pthread_t rthread;
+
+    send_winsize_info(dedicated_socket);
 
     struct client_request req = {
         .data_size = htonl(prog_len),
