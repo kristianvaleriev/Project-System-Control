@@ -6,8 +6,6 @@
 #include <ncurses.h>
 #include <vterm.h>
 
-
-
 static short vterm_color_to_ncurses(const VTermColor *c);
 static short get_pair(short fg, short bg);
 static void apply_attrs(VTermScreenCell *cell);
@@ -21,9 +19,6 @@ typedef struct {
 static ColorPair pair_cache[MAX_PAIRS];
 static int pair_count = 1;  // pair 0 is reserved
 
-
-static int prev_rows = 0;
-static int prev_cols = 0;
 /*
  * Renders only changed cells from vterm to ncurses,
  * and positions the ncurses cursor to the vterm cursor.
@@ -36,13 +31,6 @@ void render_vterm_diff(void* vt, WINDOW* display)
     werase(display);
 
     VTermScreen* vts = vterm_obtain_screen(vt);
-
-    if (rows != prev_rows || cols != prev_cols) {
-        prev_rows = rows;
-        prev_cols = cols;
-
-        vterm_set_size(vt, rows, cols);
-    }
 
     VTermPos vpos;
     VTermState* vstate = vterm_obtain_state(vt);

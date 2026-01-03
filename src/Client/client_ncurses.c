@@ -26,7 +26,6 @@ pthread_mutex_t setup_lock = PTHREAD_MUTEX_INITIALIZER;
 */ 
 
 static WINDOW* main_win;
-static WINDOW* main_pane;
 
 typedef struct {
     WINDOW* frame;
@@ -35,9 +34,10 @@ typedef struct {
 
 struct window_node {
     WINDOW* win;
-    
     int type;
+
     void* data;
+    void* vt;
 }* win_array;
 
 static size_t win_arr_count;
@@ -48,16 +48,17 @@ static void init_win_array(int n)
     win_array = calloc(n, sizeof *win_array);
     for (int i = 0; i < n; i++) 
     {
-        win_array[i].win  = NULL;
-        win_array[i].data = NULL;
         win_array[i].type = BASIC;
+        win_array[i].data = NULL;
+        win_array[i].win  = NULL;
+        win_array[i].vt   = NULL;
     }
 
     win_arr_count = 0;
     win_arr_alloced = n;
 }
 
-static size_t insert_into_windows(WINDOW* win, int type, void* data)
+static size_t insert_into_windows(WINDOW* win, int type, void* data, struct window_placement* place)
 {
     size_t idx = win_arr_count++;
 
@@ -72,11 +73,14 @@ static size_t insert_into_windows(WINDOW* win, int type, void* data)
     win_array[idx].win = win;
     win_array[idx].type = type;
     win_array[idx].data = data;
+    
+    if (place) 
+        place->winn = &win_array[idx];
 
     return idx;
 }
-#define insert_into_windows_def(win) \
-        insert_into_windows(win, 0, NULL)
+#define insert_into_windows_def(win, place) \
+        insert_into_windows(win, 0, NULL, place)
 
 static void refresh_windows(void)
 {
@@ -95,8 +99,28 @@ static void clear_windows(void)
     refresh_windows();
 }
 
+WINDOW* setup_window(struct window_placement* new_win)
+{
+    struct coords c = new_win->coords;
+    struct coords empty = {0};
+    if (!memcmp(&c, &empty, sizeof empty))
+        getmaxyx(stdscr, c.rows, c.cols);
 
-void init_ncurses(WINDOW** std_win)
+    WINDOW* win = newwin(c.rows, c.cols, c.startx, c.starty);
+    if (!win) 
+        err_quit_msg("could not create new window");
+
+    wattrset(win, A_NORMAL);
+    idlok(win, FALSE);
+    scrollok(win, FALSE);
+    leaveok(win, TRUE);
+
+    insert_into_windows_def(win, new_win);
+
+    return win;
+}
+
+void init_ncurses(void)
 {
     initscr();
     curs_set(0);
@@ -110,22 +134,9 @@ void init_ncurses(WINDOW** std_win)
     for (int color_pair = 0; color_pair <= 255; color_pair++)
         init_pair(color_pair + 1, color_pair, -1);
 
-
     atexit((void(*)(void)) endwin);
    
-    insert_into_windows_def(stdscr);
-
-    if (!std_win) return;
-
-    WINDOW* win = newwin(LINES, COLS, 0, 0);
-    insert_into_windows_def(win);
-
-    wattrset(win, A_NORMAL);
-    idlok(win, FALSE);
-    scrollok(win, FALSE);
-    leaveok(win, TRUE);
-
-    *std_win = win;
+    insert_into_windows_def(stdscr, NULL);
 }
 
 void display_panel_border(struct window_node* winn)
@@ -146,36 +157,48 @@ void display_panel_border(struct window_node* winn)
 
 int begin_row = 1, begin_col = 1;
 
-void make_panel(WINDOW** frame, WINDOW** pane, chtype* border,
-                int rows, int cols, int starty, int startx)
+void make_panel(WINDOW** ret_frame, WINDOW** ret_pane, struct window_placement* place)
 {
-    *frame = newwin(rows, cols, starty, startx);
-    *pane  = derwin(*frame, rows - 1, cols - 1, begin_row, begin_col);
+    WINDOW* frame, *pane;
 
-    if (!*frame || !*pane) {
-        err_cont(0, "window creating failed");
-        return;
-    }
+    chtype* border = place->border;
+
+    struct coords c = place->coords;
+    int rows = c.rows;
+    int cols = c.cols;
+    int starty = c.starty;
+    int startx = c.startx;
+
+    frame = newwin(rows, cols, starty, startx);
+    if (!frame)
+        err_quit_msg("frame window creation failed");
+
+    pane = derwin(frame, rows - 1, cols - 1, begin_row, begin_col);
+    if (!pane)
+        err_quit_msg("pane window creation failed");
 
     int maxy, maxx;
     if (main_win) {
         getmaxyx(main_win, maxy, maxx);
-        wresize(main_win, maxy - rows, maxx);
+        wresize(main_win, maxy - rows - 1, maxx);
     }
     else {
         getmaxyx(stdscr, maxy, maxx);
-        wresize(stdscr, maxy - rows, maxx);
+        wresize(stdscr, maxy - rows - 1, maxx);
     }
 
     win_pane_t* new_pane = malloc(sizeof *new_pane);
-    new_pane->frame = *frame;
+    new_pane->frame = frame;
     memcpy(new_pane->border_chs, border, 8 * sizeof *border);
 
     size_t idx;
-    insert_into_windows(*frame, FRAME, &win_array[win_arr_count]);
-    idx = insert_into_windows(*pane, PANE, new_pane);
+    idx = insert_into_windows(frame, FRAME, &win_array[win_arr_count], NULL);
+    idx = insert_into_windows(pane, PANE, new_pane, place);
 
     display_panel_border(&win_array[idx]);
+
+    if (ret_frame) *ret_frame = frame;
+    if (ret_pane)  *ret_pane = pane;
 }
 
 
@@ -218,161 +241,193 @@ void setup_ncurse_signal_handling(void)
     client_child_handle = old.sa_handler;
 }
 
-
-static int stdout_fd;
-static void ncurse_loop(void);
-
 static int* saved_fds = NULL;
+static size_t fd_count;
 
 static void save_fds(struct window_placement* interface, size_t count)
 {
     size_t idx = 0;
     saved_fds = calloc(count+1, sizeof *saved_fds);
-    saved_fds[idx++] = dup(STDIN_FILENO);
 
-    for_each_win(inter, interface, count) {
-        if (inter->type == MAIN)
-            continue;
+    for_each_win(inter, interface, count) 
         saved_fds[idx++] = dup(inter->fd);
-    }
+
+    fd_count = idx;
 }    
-
-static void restore_fds(struct window_placement* interface, size_t count)
-{
-    size_t idx = 0;
-    if (dup2(saved_fds[idx], STDIN_FILENO) < 0)
-        err_sys("dup2 failed when restoring STDIN");
-
-    close(saved_fds[idx++]);
-
-    for_each_win(var, interface, count) {
-        if(var->type == MAIN)
-            continue;
-    
-        if (dup2(saved_fds[idx], var->fd) < 0)
-            err_sys("dup2 failed when restoring fds");
-
-        close(saved_fds[idx++]);
-    }
-
-    free(saved_fds);
-}
 
 pid_t handle_ncurses_and_fork(struct window_placement* interface, size_t count)
 {
-    save_fds(interface, count);
+    assert(interface);
+    assert(interface[count-1].type == MAIN);
 
-    child_pid = forkpty(&stdout_fd, NULL, NULL, NULL);
+    count--;
+
+    size_t idx = 0;
+    int** pipes = NULL;
+
+    if (count) {
+        save_fds(interface, count);
+
+        pipes = calloc(count, sizeof *pipes * 2);
+
+        idx = 0;
+        for_each_win(var, interface, count) {
+            pipes[idx] = calloc(2, sizeof **pipes);
+            if (pipe(pipes[idx]) < 0)
+                err_sys("pipe failed in ncurses and fork");
+
+            idx++;
+        }
+        idx = 0;
+    }
+
+    int master_fd;
+    int stdin_fd = dup(STDIN_FILENO); 
+
+    child_pid = forkpty(&master_fd, NULL, NULL, NULL);
     if (child_pid < 0)
         err_sys("forkpty");
 
     if (!child_pid) {
-        restore_fds(interface, count);
+        close(master_fd);
 
-        sigset_t sigset, oldmask;
-        sigemptyset(&sigset);
-        sigaddset(&sigset, SIGUSR2);
-        sigprocmask(SIG_SETMASK, &sigset, &oldmask);
+        if (dup2(stdin_fd, STDIN_FILENO) < 0)
+            err_sys("dup2 failed for the standart input descripor");
+        close(stdin_fd);
 
-        int signo = -1;
-        while(signo != SIGUSR2) 
-            sigwait(&sigset, &signo); 
+        if (count) {
+            for_each_win(var, interface, count) {
+                if (dup2(pipes[idx][1], var->fd) < 0) 
+                    err_sys("dup2 failed in child's ncurses and fork");
+                close(saved_fds[idx]);
 
-        sigprocmask(SIG_SETMASK, &oldmask, NULL);
+                close(pipes[idx][1]);
+                free(pipes[idx]);
+
+                idx++;
+            }
+
+            free(saved_fds);
+            free(pipes);
+        }
+
+        wait_for_signal(SIGUSR2);
 
         return getppid();
     }
-   
+    close(stdin_fd);
+
+    if (count) {
+        for_each_win(var, interface, count) 
+            var->fd = pipes[idx++][0];
+
+        free(pipes);
+    }
+
+    interface[count].fd = master_fd;
+
     return 0;
 }
+
+
+static void ncurse_loop(struct window_placement* interface, size_t count);
 
 void* setup_client_ncurses(struct window_placement* interface, size_t count)
 {
     //pthread_mutex_lock(&setup_lock);
     init_win_array(5);
 
-    init_ncurses(&main_win);
+    init_ncurses();
     setup_ncurse_signal_handling();
 
-    //is_setup_done = 1;
+    main_win = setup_window(&interface[count-1]);
 
-    //pthread_mutex_unlock(&setup_lock);
-    //pthread_cond_signal(&setup_cond);
+    for_each_win(var, interface, count) {
+        switch (var->type) {
+        case MAIN: 
+        break;
 
-    chtype border_chs[8]; 
-    memset(border_chs, ' ', 8 * sizeof *border_chs);
-    border_chs[2] = 0;
+        case BASIC: 
+            setup_window(var);
+        break;
 
-    int y,x;
-    getmaxyx(main_win, y, x);
-    size_t n_rows = y * 0.25;
+        case PANE:
+            make_panel(NULL, NULL, var);
+        break;
 
-    WINDOW* frame;
-    make_panel(&frame, &main_pane, border_chs, n_rows, x, y - n_rows, 0);
+        default: 
+            err_info("not recognized window type!");
+        }
+
+        if (var->type != FRAME && (var->type >= BASIC && var->type <= PANE)) {
+            set_nonblocking(var->fd);
+            var->winn->vt = initialize_vterm(var->winn->win);
+        }
+
+        if (var->type != MAIN)
+            set_nonblocking(saved_fds[var - interface]);
+    }
     refresh_windows();
 
     kill(child_pid, SIGUSR2);
    
-    ncurse_loop();
+    ncurse_loop(interface, count);
 
     return 0;
 }
 
 static void handle_ncurses_resize(void);
 
-static void ncurse_loop(void)
+static void ncurse_loop(struct window_placement* interface, size_t count)
 {
     char buf[1028];
     ssize_t rc;
 
-    void* out_vt = initialize_vterm(main_win);
-    void* err_vt = initialize_vterm(main_pane);
-
-    int stderr_fd = open(LOG_NAME, O_RDONLY);
-    set_nonblocking(stderr_fd);
-    set_nonblocking(stdout_fd);
+    int maxy, maxx;
 
     while (1) 
     { 
+        for_each_win(var, interface, count) 
+        {
+            if ((rc = read(var->fd, buf, sizeof buf)) > 0) {
+                vterm_input_write(var->winn->vt, buf, rc);
+                render_vterm_diff(var->winn->vt, var->winn->win);
+                napms(30);
+
+                if (var->type != MAIN) {
+                    if (write(saved_fds[var - interface], buf, rc) < 0)
+                        err_sys("write in ncurses loop");
+                }
+            }
+
+            if (ncurse_resize) {
+                getmaxyx(var->winn->win, maxy, maxx);
+                vterm_set_size(var->winn->vt, maxy, maxx);
+            }
+        }
+
         if (ncurse_resize) {
             ncurse_resize = 0;
+
             handle_ncurses_resize();
         }
-
-        if ((rc = read(stderr_fd, buf, sizeof buf)) > 0) {
-            vterm_input_write(err_vt, buf, rc);
-            render_vterm_diff(err_vt, main_pane);
-            napms(80);
-        }
-
-        while ((rc = read(stdout_fd, buf, sizeof buf)) > 0) {
-            vterm_input_write(out_vt, buf, rc);
-            render_vterm_diff(out_vt, main_win);
-        }
-
     }
 }
 
 void handle_ncurses_resize(void)
 {
     endwin();
-    clear_windows();
 
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
-
-    /*
-    extern VTerm* vt;
-    vterm_set_size(vt, rows, cols);
-    */
 
     struct winsize ws = { 0 };
     ws.ws_row = rows;
     ws.ws_col = cols;
 
-    ioctl(stdout_fd, TIOCSWINSZ, &ws);
+    ioctl(STDIN_FILENO, TIOCSWINSZ, &ws);
 
-    clear_windows();
+//    clear_windows();
     for (int i = 0; i < win_arr_count; i++) 
     {
         if (win_array[i].type == PANE)

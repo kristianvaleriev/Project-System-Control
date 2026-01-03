@@ -60,6 +60,11 @@ volatile sig_atomic_t tty_resized = 1;
 char* program_name = 0;
 char* program_storage = (char*) -1;
 
+struct read_thd_args {
+    int socket;
+    int write_fd;
+    int exit_flag;
+};
 
 void    save_to_file(char*, void*, size_t);
 int     handle_connection_socket(char* server_addr, size_t addr_size);
@@ -167,24 +172,27 @@ int main(int argc, char** argv)
         }
         else err_info("could not create err.log! Sorry...");
 
+        struct winsize win; 
+        if (ioctl(STDIN_FILENO, TIOCGWINSZ, &win) < 0) 
+            err_sys("error on retriving window size");
+
         struct window_placement interface[] = {
+            {
+                .fd = STDERR_FILENO,
+                .type = PANE,
+                .coords = {
+                    .rows = win.ws_row * 0.25,
+                    .cols = win.ws_col,
+                    .starty = win.ws_row - win.ws_row * 0.25,
+                    .startx = 0,
+                },
+                .border = {' ', ' ', 0, ' ', ' ', ' ', ' ', ' '},
+            },
             {
                 .fd = STDOUT_FILENO, 
                 .type = MAIN,
                 .border = {' '},
             },
-            {
-                .fd = STDERR_FILENO,
-                .type = PANE,
-                .coords = {
-                    .rows = LINES * 0.25,
-                    .cols = COLS,
-                    .startx = 1,
-                    .starty = 1,
-                },
-                .border = {' ', ' ', 0, ' ', ' ', ' ', ' ', ' '},
-            },
-            {}
         };
 
         size_t count = sizeof interface / sizeof *interface;
@@ -227,11 +235,12 @@ int main(int argc, char** argv)
     set_nonblocking(STDIN_FILENO);
     set_nonblocking(server_socket);
 
-    int* fds = calloc(2, sizeof *fds);
-    fds[0] = server_socket;
-    fds[1] = STDOUT_FILENO;
+    struct read_thd_args* args = malloc(sizeof *args);
+    args->socket    = server_socket;
+    args->write_fd  = STDOUT_FILENO;
+    args->exit_flag = 1;
 
-    pthread_create(&reading_thread, NULL, reading_server_function, fds);
+    pthread_create(&reading_thread, NULL, reading_server_function, (void*) args);
     main_cmd_loop(server_socket);
 
 
@@ -277,11 +286,14 @@ void main_cmd_loop(int server_socket)
 
 // Tried to use the util threaded function, but it is too
 // different and it would be a mess.
-void* reading_server_function(void* fds)
+void* reading_server_function(void* arg)
 {
-    int server_socket = *((int*) fds);
-    int write_fd      = *((int*) (fds + sizeof(int)));
-    free(fds);
+    struct read_thd_args* args = arg;
+    int server_socket = args->socket;
+    int write_fd      = args->write_fd;
+    int flag          = args->exit_flag;
+
+    free(args);
 
     pthread_mutex_lock(&reading_thread_mutex);
     thread_count++;
@@ -294,8 +306,13 @@ void* reading_server_function(void* fds)
     while (1)
     {
         if ((rc = recv(server_socket, buf, sizeof buf, 0)) <= 0) {
-            if (!rc) 
-                break;
+            if (!rc) {
+                if (flag) {
+                    info_msg("server connection's off. Exiting...");
+                    exit(0);
+                }
+                else break;
+            }
 
             if (errno != EWOULDBLOCK)
                 err_info("reading function's recv fail");
@@ -374,10 +391,12 @@ void setup_dedicated_program(char* prog_name)
         sendall(dedicated_socket, prog_name, prog_len, 0) < 0)
         err_info("sendall failed in data send of a dedicated program");
     else {
-        int* fds = calloc(2, sizeof *fds);
-        fds[0] = dedicated_socket;
-        fds[1] = STDERR_FILENO;
-        pthread_create(&rthread, NULL, reading_server_function, fds);
+        struct read_thd_args* args = malloc(sizeof *args);
+        args->socket    = dedicated_socket;
+        args->write_fd  = STDERR_FILENO;
+        args->exit_flag = 0;
+
+        pthread_create(&rthread, NULL, reading_server_function, (void*) args);
     }
 }
 

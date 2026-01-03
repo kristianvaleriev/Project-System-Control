@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <assert.h>
 #include <sys/socket.h>
+#include <signal.h>
 #include <poll.h>
 
 extern char* program_name;
@@ -117,4 +118,18 @@ void set_nonblocking(int fd)
     int flags = fcntl(fd, F_GETFL, 0);
     if (fcntl(fd, F_SETFL, flags | O_NONBLOCK)) 
         err_sys("fcntl");
+}
+
+void wait_for_signal(int signal)
+{
+    sigset_t sigset, oldmask;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, signal);
+    sigprocmask(SIG_SETMASK, &sigset, &oldmask);
+
+    int signo = -1;
+    while(signo != signal) 
+        sigwait(&sigset, &signo); 
+
+    sigprocmask(SIG_SETMASK, &oldmask, NULL);
 }
