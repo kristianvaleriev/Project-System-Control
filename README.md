@@ -25,9 +25,30 @@ The names of the programs can easily be changed through the Makefile.
     If a valid program name is given, the server starts the program and sends the output to the client. The client renders the output in another window, also writing it to the stderr stream.
 * **-n, --no-ncurses**\
     The SC-Client program functions jsut as a basic terminal. (way less buggy)
+
+## Building
+### Dependencies
+This project is build on Linux and it uses make. It requires a working C compiler, standard library and headers.\
+If building with ncurses (graphical interface) then **_ncurses 6.5+_** and **_libvterm 0.3+_** must also be installed.
+
+### Steps
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/kristianvaleriev/Project-System-Control/
+    cd Project-System-Control
+    ```
+2.  **Make  the programs:**
+    ```bash
+    make // builds both SC-Server and SC-Client;
     
+    make client  [client_name=<name>]
+    make serrver [server_name=<name>]
+    ```
+3. **Delete/Clear object files and dependencies:**
+    ```bash
+    make clean
+    ```
     
-  
 ## Demo videos
 https://github.com/user-attachments/assets/fc9f0d3a-ad26-44dc-b6d4-0099fa4d5445
 
