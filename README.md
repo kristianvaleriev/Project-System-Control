@@ -1,6 +1,12 @@
 # Project: System Control
 This project lets you connect remotly to a device in the same local network automatically (using multicast) or with a given IP address and control it with bash. The remote device has to be running the SC-Server program so that a SC-Client program can connect to it and start exchanging data. The SC-Server creates a pseaudo-terminal on which runs bash and forwards user sent input (given it's a command client request). Everything read from the terminal (e.g. bash output from a command) is send back to the client and rendered via the client's terminal line discipline (or if running in ncurses, via virtual terminal emulator, i.e. libvterm).
- 
+
+There is a .service file for the SC-Server, for the automatic start of the program by systemd at boot.
+
+If the server is started with root privileges then it uses "/var/lib/SC-Server" for storage directory (e.g. for storing source and object kernel module files). Else it uses the "/home/{user}/SC-Server" directory.
+
+The names of the programs can easily be changed through the Makefile.
+
 ## Options
 ### SC-Server 
 * **--daemoned**\
@@ -12,7 +18,7 @@ This project lets you connect remotly to a device in the same local network auto
 * **-f, --files** list of file names\
     Sends the given files to the server, which writes them on the device.
 * **-d, --drivers** list of *.c files\
-    Like in the "-f" option, but the server also compiles them as a Linux Kernel Module agains the linux kernel on it's the device and installs them on the running OS (given it has root privileges).
+    Like in the "-f" option, but the server also compiles them as a Linux Kernel Module agains the linux kernel on it's the device and installs them on the running OS (given it has super user privileges).
 * **-p, --program** [program name]\
     Only works if the SC-Client is compiled without specifiing the -DWITHOUT_NCURSES flag to the compiler and also if the "-n" flag is **not** given to the program.\
     If no argument is given to this option then the default program (dmesg --follow -H) isn't started.\
