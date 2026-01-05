@@ -1,14 +1,26 @@
 # Project: System Control
 This project lets you connect remotly to a device in the same local network automatically (using multicast) or with a given IP address and control it with bash. The remote device has to be running the SC-Server program so that a SC-Client program can connect to it and start exchanging data. The SC-Server creates a pseaudo-terminal on which runs bash and forwards user sent input (given it's a command client request). Everything read from the terminal (e.g. bash output from a command) is send back to the client and rendered via the client's terminal line discipline (or if running in ncurses, via virtual terminal emulator, i.e. libvterm).
-
+ 
 ## Options
-### SC-Server
-* **--daemoned**
-    Runs the server in daemoned mode (defined by Unix). Uses syslog() for debug messages and information.
+### SC-Server 
+* **--daemoned**\
+    Runs the server in daemoned mode (defined by Unix).
   
 ### SC-Client
-* **-a, --address**
-    Doesn't begin to search for multicast messages in the local network, but uses the given IP address to search for the device that runs the SC-Server. Error        message if the given addr is invalid.
+* **-a, --address**\
+    Doesn't begin to search for multicast messages in the local network, but uses the given IP address to search for the device that runs the SC-Server. Error message if the given address is invalid.
+* **-f, --files** list of file names\
+    Sends the given files to the server, which writes them on the device.
+* **-d, --drivers** list of *.c files\
+    Like in the "-f" option, but the server also compiles them as a Linux Kernel Module agains the linux kernel on it's the device and installs them on the running OS (given it has root privileges).
+* **-p, --program** [program name]\
+    Only works if the SC-Client is compiled without specifiing the -DWITHOUT_NCURSES flag to the compiler and also if the "-n" flag is **not** given to the program.\
+    If no argument is given to this option then the default program (dmesg --follow -H) isn't started.\
+    If a valid program name is given, the server starts the program and sends the output to the client. The client renders the output in another window, also writing it to the stderr stream.
+* **-n, --no-ncurses**\
+    The SC-Client program functions jsut as a basic terminal. (way less buggy)
+    
+    
   
 ## Demo videos
 https://github.com/user-attachments/assets/fc9f0d3a-ad26-44dc-b6d4-0099fa4d5445
