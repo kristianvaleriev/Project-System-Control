@@ -25,7 +25,7 @@
 #include "dynamic_files.h"
 #include "client_networking.h"
 
-#define DEF_PROG "dmesg --follow"
+#define DEF_PROG "dmesg --follow -H"
 
 #define SHORT_ARGS "-a:f:d:np::"
 static const struct option long_options[] = {
@@ -39,6 +39,7 @@ static const struct option long_options[] = {
 
 #ifndef WITHOUT_NCURSES
     #include "client_ncurses.h"
+    static int using_ncurses = 1;
     
 /*
     static pthread_t ncurses_thread;
@@ -48,6 +49,9 @@ static const struct option long_options[] = {
 
     extern int is_setup_done;
 */
+
+#else 
+    static int using_ncurses = 0;
 
 #endif
 
@@ -76,7 +80,6 @@ void    main_cmd_loop(int);
 
 int main(int argc, char** argv)
 {
-    int using_ncurses = 1;
     char* server_addr = NULL;
     char* dedicated_program = strdup(DEF_PROG);
 
@@ -199,7 +202,6 @@ int main(int argc, char** argv)
         if (!handle_ncurses_and_fork(interface, count))
             setup_client_ncurses(interface, count);
     } 
-
 #endif
 
     if (!server_addr) 
@@ -345,6 +347,11 @@ void send_winsize_info(int server_socket)
         err_info("error on retriving window size");
         return;
     }
+
+    // Hack...
+    if (!win.ws_row) win.ws_row = 250;
+    if (!win.ws_col) win.ws_col = 500;
+
     struct client_request req = {
         .data_size = htonl(sizeof win),
         .type      = htonl(TYPE_WINSIZE),
@@ -388,8 +395,9 @@ void setup_dedicated_program(char* prog_name)
     };
 
     if (sendall(dedicated_socket, &req, sizeof req, 0) < 0 ||
-        sendall(dedicated_socket, prog_name, prog_len, 0) < 0)
+        sendall(dedicated_socket, prog_name, prog_len, 0) < 0) {
         err_info("sendall failed in data send of a dedicated program");
+    }
     else {
         struct read_thd_args* args = malloc(sizeof *args);
         args->socket    = dedicated_socket;

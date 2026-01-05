@@ -146,7 +146,7 @@ int handle_drivers(int socket, int term_fd, struct client_request* req)
     while ((status = waitpid(pid, NULL, WNOHANG)) == 0) 
         ;
 
-    if (status < 0) {  
+    if (status < 0 && errno != ECHILD) {  
         err_sys("waitpid failed");
         return errno;
     }

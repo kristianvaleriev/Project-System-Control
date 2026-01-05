@@ -19,6 +19,8 @@ typedef struct {
 static ColorPair pair_cache[MAX_PAIRS];
 static int pair_count = 1;  // pair 0 is reserved
 
+int is_altscreen;
+
 /*
  * Renders only changed cells from vterm to ncurses,
  * and positions the ncurses cursor to the vterm cursor.
@@ -43,7 +45,7 @@ void render_vterm_diff(void* vt, WINDOW* display)
         for (int c = 0; c < cols; c++) 
         {
             if (!vterm_screen_get_cell(vts, (VTermPos){r, c}, &cell) ||
-                cell.width == 0)
+                !cell.width)
                 continue;
 
             chtype ch = cell.chars[0] ? cell.chars[0] : ' ';
@@ -88,6 +90,7 @@ void render_vterm_diff(void* vt, WINDOW* display)
     mvwaddch(display, vpos.row, vpos.col, ch);
     wattroff(display, A_REVERSE);
 
+OUT:
     wrefresh(display);
 }
 
@@ -120,11 +123,6 @@ static short vterm_color_to_ncurses(const VTermColor *c)
     }
 
     return -1;
-}
-
-static void apply_attrs(VTermScreenCell *cell) 
-{
-    
 }
 
 static short get_pair(short fg, short bg)
@@ -172,8 +170,18 @@ void render_vterm_to_ncurses(void)
 */
 
 static int damage_callback(VTermRect rect, void* user) {return 1;}
-static VTermScreenCallbacks screen_cb = {
+
+static int termprop_callback(VTermProp prop, VTermValue* val, void* user)
+{
+    if (prop == VTERM_PROP_ALTSCREEN) 
+        is_altscreen = val->boolean;
+
+    return 1;
+}
+
+static VTermScreenCallbacks screen_cbs = {
     .damage = damage_callback,
+    .settermprop = termprop_callback,
 };
 
 void* initialize_vterm(WINDOW* win)
@@ -188,7 +196,7 @@ void* initialize_vterm(WINDOW* win)
     vterm_set_utf8(vt, 1);
 
     VTermScreen* vts = vterm_obtain_screen(vt);
-    vterm_screen_set_callbacks(vts, NULL, NULL);
+    vterm_screen_set_callbacks(vts, &screen_cbs, NULL);
     vterm_screen_enable_altscreen(vts, 1);
     vterm_screen_reset(vts, 1);
 

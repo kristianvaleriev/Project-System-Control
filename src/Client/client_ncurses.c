@@ -1,3 +1,4 @@
+#include <asm-generic/ioctls.h>
 #ifndef WITHOUT_NCURSES
 
 #include "../../include/includes.h"
@@ -106,7 +107,7 @@ WINDOW* setup_window(struct window_placement* new_win)
     if (!memcmp(&c, &empty, sizeof empty))
         getmaxyx(stdscr, c.rows, c.cols);
 
-    WINDOW* win = newwin(c.rows, c.cols, c.startx, c.starty);
+    WINDOW* win = newwin(c.rows, c.cols, c.starty, c.startx);
     if (!win) 
         err_quit_msg("could not create new window");
 
@@ -164,27 +165,20 @@ void make_panel(WINDOW** ret_frame, WINDOW** ret_pane, struct window_placement* 
     chtype* border = place->border;
 
     struct coords c = place->coords;
-    int rows = c.rows;
-    int cols = c.cols;
-    int starty = c.starty;
-    int startx = c.startx;
+    frame = setup_window(place);
 
-    frame = newwin(rows, cols, starty, startx);
-    if (!frame)
-        err_quit_msg("frame window creation failed");
-
-    pane = derwin(frame, rows - 1, cols - 1, begin_row, begin_col);
+    pane = derwin(frame, c.rows - 1, c.cols - 1, begin_row, begin_col);
     if (!pane)
         err_quit_msg("pane window creation failed");
 
     int maxy, maxx;
     if (main_win) {
         getmaxyx(main_win, maxy, maxx);
-        wresize(main_win, maxy - rows - 1, maxx);
+        wresize(main_win, maxy - c.rows - 1, maxx);
     }
     else {
         getmaxyx(stdscr, maxy, maxx);
-        wresize(stdscr, maxy - rows - 1, maxx);
+        wresize(stdscr, maxy - c.rows - 1, maxx);
     }
 
     win_pane_t* new_pane = malloc(sizeof *new_pane);
@@ -192,7 +186,6 @@ void make_panel(WINDOW** ret_frame, WINDOW** ret_pane, struct window_placement* 
     memcpy(new_pane->border_chs, border, 8 * sizeof *border);
 
     size_t idx;
-    idx = insert_into_windows(frame, FRAME, &win_array[win_arr_count], NULL);
     idx = insert_into_windows(pane, PANE, new_pane, place);
 
     display_panel_border(&win_array[idx]);
@@ -318,8 +311,11 @@ pid_t handle_ncurses_and_fork(struct window_placement* interface, size_t count)
     close(stdin_fd);
 
     if (count) {
-        for_each_win(var, interface, count) 
-            var->fd = pipes[idx++][0];
+        for_each_win(var, interface, count) {
+            var->fd = pipes[idx][0];
+            free(pipes[idx]);
+            idx++;
+        }
 
         free(pipes);
     }
@@ -384,6 +380,7 @@ static void ncurse_loop(struct window_placement* interface, size_t count)
     ssize_t rc;
 
     int maxy, maxx;
+    extern int is_altscreen;
 
     while (1) 
     { 
@@ -392,7 +389,7 @@ static void ncurse_loop(struct window_placement* interface, size_t count)
             if ((rc = read(var->fd, buf, sizeof buf)) > 0) {
                 vterm_input_write(var->winn->vt, buf, rc);
                 render_vterm_diff(var->winn->vt, var->winn->win);
-                napms(30);
+                napms(50);
 
                 if (var->type != MAIN) {
                     if (write(saved_fds[var - interface], buf, rc) < 0)
@@ -408,7 +405,6 @@ static void ncurse_loop(struct window_placement* interface, size_t count)
 
         if (ncurse_resize) {
             ncurse_resize = 0;
-
             handle_ncurses_resize();
         }
     }
@@ -427,7 +423,6 @@ void handle_ncurses_resize(void)
 
     ioctl(STDIN_FILENO, TIOCSWINSZ, &ws);
 
-//    clear_windows();
     for (int i = 0; i < win_arr_count; i++) 
     {
         if (win_array[i].type == PANE)
