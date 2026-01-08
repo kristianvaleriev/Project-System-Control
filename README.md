@@ -24,7 +24,7 @@ The names of the programs can easily be changed through the Makefile.
     If no argument is given to this option then the default program (dmesg --follow -H) isn't started.\
     If a valid program name is given, the server starts the program and sends the output to the client. The client renders the output in another window, also writing it to the stderr stream.
 * **-n, --no-ncurses**\
-    The SC-Client program functions jsut as a basic terminal. (way less buggy)
+    The SC-Client program functions just as a basic terminal. (way less buggy)
 
 ## Building
 ### Dependencies
