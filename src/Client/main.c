@@ -33,7 +33,7 @@ static const struct option long_options[] = {
     { "drivers",  required_argument, NULL, 'd'},
     { "files",    required_argument, NULL, 'f'},
     { "program",  optional_argument, NULL, 'p'},
-    { "no-ncurse", no_argument, NULL, 'n'},
+    { "no-ncurses", no_argument, NULL, 'n'},
     {},
 };
 
@@ -343,7 +343,7 @@ void send_winsize_info(int server_socket)
         return;
 
     struct winsize win; 
-    if (ioctl(STDIN_FILENO, TIOCGWINSZ, &win) < 0) {
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &win) < 0) {
         err_info("error on retriving window size");
         return;
     }
@@ -351,6 +351,9 @@ void send_winsize_info(int server_socket)
     // Hack...
     if (!win.ws_row) win.ws_row = 250;
     if (!win.ws_col) win.ws_col = 500;
+
+//    info_msg("sending terminal size of %d rows and %d cols", 
+//             win.ws_row, win.ws_col);
 
     struct client_request req = {
         .data_size = htonl(sizeof win),
@@ -387,7 +390,6 @@ void setup_dedicated_program(char* prog_name)
     size_t prog_len = strlen(prog_name) + 1;
     pthread_t rthread;
 
-    send_winsize_info(dedicated_socket);
 
     struct client_request req = {
         .data_size = htonl(prog_len),
@@ -397,15 +399,18 @@ void setup_dedicated_program(char* prog_name)
     if (sendall(dedicated_socket, &req, sizeof req, 0) < 0 ||
         sendall(dedicated_socket, prog_name, prog_len, 0) < 0) {
         err_info("sendall failed in data send of a dedicated program");
-    }
-    else {
-        struct read_thd_args* args = malloc(sizeof *args);
-        args->socket    = dedicated_socket;
-        args->write_fd  = STDERR_FILENO;
-        args->exit_flag = 0;
 
-        pthread_create(&rthread, NULL, reading_server_function, (void*) args);
+        return;
     }
+
+    send_winsize_info(dedicated_socket);
+
+    struct read_thd_args* args = malloc(sizeof *args);
+    args->socket    = dedicated_socket;
+    args->write_fd  = STDERR_FILENO;
+    args->exit_flag = 0;
+
+    pthread_create(&rthread, NULL, reading_server_function, (void*) args);
 }
 
 static void sig_winch_handle(int _) { tty_resized = 1; }

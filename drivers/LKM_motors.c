@@ -1,5 +1,4 @@
-#include "linux/init.h"
-#include "linux/types.h"
+#include "linux/gpio/consumer.h"
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/platform_device.h>
@@ -10,19 +9,26 @@
 
 #include <linux/miscdevice.h>
 #include <linux/mod_devicetable.h>
+#include <linux/gpio.h>
 
+struct gpio_desc* gpio;
 
 static ssize_t motor_write(struct file* file, const char __user* buf,
                            size_t count, loff_t* ppos)
 {
     char* data = kzalloc(count, GFP_KERNEL);
     if (copy_from_user(data, buf, count)) {
-        pr_err("copy from user");
+        pr_err("copy from user\n");
         return -EFAULT;
     }
 
     data[count - 1] = '\0';
-    pr_info("msg rcved from user space: %s", data);
+    pr_info("msg rcved from user space: %s\n", data);
+
+    if (!strcmp(data, "on")) 
+        gpiod_set_value(gpio, GPIOD_OUT_HIGH);
+    else 
+        gpiod_set_value(gpio, GPIOD_OUT_LOW);
 
     kfree(data);
 
@@ -45,14 +51,20 @@ static const struct file_operations motor_ops = {
 
 static int motor_probe(struct platform_device* pdev)
 {
-    pr_info("entering probe");
+    pr_info("entering probe...\n");
+
+    gpio = devm_gpiod_get(&pdev->dev, NULL, GPIOD_OUT_LOW);
+    if (IS_ERR(gpio)) {
+        dev_err(&pdev->dev, "gpio get failed\n");
+        return PTR_ERR(gpio);
+    }
 
     struct miscdevice* motor_dev = kzalloc(sizeof *motor_dev, GFP_KERNEL);
 
     const char* name;
     of_property_read_string(pdev->dev.of_node, "label", &name);
 
-    motor_dev->name = name;
+    motor_dev->name = "test-car";
     motor_dev->fops = &motor_ops;
     motor_dev->minor = MISC_DYNAMIC_MINOR;
 
@@ -64,7 +76,7 @@ static int motor_probe(struct platform_device* pdev)
 
     platform_set_drvdata(pdev, motor_dev);
 
-    pr_info("exiting probe");
+    pr_info("exiting probe\n");
     return 0;
 }
 

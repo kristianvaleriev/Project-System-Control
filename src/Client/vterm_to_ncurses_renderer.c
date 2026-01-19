@@ -45,7 +45,7 @@ void render_vterm_diff(void* vt, WINDOW* display)
         for (int c = 0; c < cols; c++) 
         {
             if (!vterm_screen_get_cell(vts, (VTermPos){r, c}, &cell) ||
-                !cell.width)
+                cell.width == 0)
                 continue;
 
             chtype ch = cell.chars[0] ? cell.chars[0] : ' ';
@@ -77,6 +77,9 @@ void render_vterm_diff(void* vt, WINDOW* display)
             attroff(attrs);
         }
     }
+    
+    if (is_altscreen)
+        goto OUT;
 
     if (vpos.row >= rows) vpos.row = rows - 1;
     if (vpos.col >= cols) vpos.col = cols - 1;

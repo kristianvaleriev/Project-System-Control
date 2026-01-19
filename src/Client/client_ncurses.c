@@ -138,6 +138,10 @@ void init_ncurses(void)
     atexit((void(*)(void)) endwin);
    
     insert_into_windows_def(stdscr, NULL);
+
+    idlok(stdscr, FALSE);
+    scrollok(stdscr, FALSE);
+    leaveok(stdscr, FALSE);
 }
 
 void display_panel_border(struct window_node* winn)

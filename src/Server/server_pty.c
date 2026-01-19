@@ -49,7 +49,8 @@ int set_win_size(int client_socket, int term_fd, struct client_request* req)
     if (ioctl(term_fd, TIOCSWINSZ, &wins) < 0)
         err_sys("ioctl");
 
-    info_msg("terminal window's size set");
+    info_msg("terminal window's size set to %d rows and %d cols", 
+             wins.ws_row, wins.ws_col);
 
     return 0;
 }
