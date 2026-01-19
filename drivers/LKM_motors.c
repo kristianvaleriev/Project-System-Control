@@ -11,7 +11,8 @@
 #include <linux/mod_devicetable.h>
 #include <linux/gpio.h>
 
-struct gpio_desc* gpio;
+struct gpio_desc* gpioLeft;
+struct gpio_desc* gpioRight;
 
 static ssize_t motor_write(struct file* file, const char __user* buf,
                            size_t count, loff_t* ppos)
@@ -23,9 +24,49 @@ static ssize_t motor_write(struct file* file, const char __user* buf,
     }
 
     data[count - 1] = '\0';
-    pr_info("msg rcved from user space: %s\n", data);
+    pr_info("user data writen to driver: %s\n", data);
 
-    if (!strcmp(data, "on")) 
+    for (size_t i = 0; i < count; i++)
+    {
+        if (data[i] >= 'a' && data[i] <= 'Z')
+            data[i] -= 32;
+
+        switch (data[i]) {
+        case 'A':
+            gpiod_set_value(gpioRight, GPIOD_OUT_HIGH);
+            gpiod_set_value(gpioLeft, GPIOD_OUT_LOW);
+
+            pr_info("turning left...\n");
+
+            break;
+
+        case 'D':
+            gpiod_set_value(gpioRight, GPIOD_OUT_LOW);
+            gpiod_set_value(gpioLeft, GPIOD_OUT_HIGH);
+
+            pr_info("turning right...\n");
+
+            break;
+
+        case 'W':
+            gpiod_set_value(gpioRight, GPIOD_OUT_HIGH);
+            gpiod_set_value(gpioLeft, GPIOD_OUT_HIGH);
+
+            pr_info("going forward...\n");
+
+            break;
+
+        case 'S':
+            gpiod_set_value(gpioRight, GPIOD_OUT_LOW);
+            gpiod_set_value(gpioLeft, GPIOD_OUT_LOW);
+
+            pr_info("breaks...\n");
+
+            break;
+        }
+    }
+
+    if (!strcmp(data, "")) 
         gpiod_set_value(gpio, GPIOD_OUT_HIGH);
     else 
         gpiod_set_value(gpio, GPIOD_OUT_LOW);
@@ -64,7 +105,7 @@ static int motor_probe(struct platform_device* pdev)
     const char* name;
     of_property_read_string(pdev->dev.of_node, "label", &name);
 
-    motor_dev->name = "test-car";
+    motor_dev->name = name;
     motor_dev->fops = &motor_ops;
     motor_dev->minor = MISC_DYNAMIC_MINOR;
 
