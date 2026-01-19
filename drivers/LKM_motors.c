@@ -66,11 +66,6 @@ static ssize_t motor_write(struct file* file, const char __user* buf,
         }
     }
 
-    if (!strcmp(data, "")) 
-        gpiod_set_value(gpio, GPIOD_OUT_HIGH);
-    else 
-        gpiod_set_value(gpio, GPIOD_OUT_LOW);
-
     kfree(data);
 
     *ppos += count;
@@ -94,11 +89,20 @@ static int motor_probe(struct platform_device* pdev)
 {
     pr_info("entering probe...\n");
 
-    gpio = devm_gpiod_get(&pdev->dev, NULL, GPIOD_OUT_LOW);
-    if (IS_ERR(gpio)) {
+    gpioRight = devm_gpiod_get_index(&pdev->dev, NULL, 0, GPIOD_OUT_LOW);
+    gpioLeft = devm_gpiod_get_index(&pdev->dev, NULL, 1, GPIOD_OUT_LOW);
+
+    if (IS_ERR(gpioLeft)) {
         dev_err(&pdev->dev, "gpio get failed\n");
-        return PTR_ERR(gpio);
+        return PTR_ERR(gpioLeft);
     }
+
+    if (IS_ERR(gpioRight)) {
+        dev_err(&pdev->dev, "gpio get failed\n");
+        return PTR_ERR(gpioRight);
+    }
+
+    pr_info("successfully got gpios\n");
 
     struct miscdevice* motor_dev = kzalloc(sizeof *motor_dev, GFP_KERNEL);
 
